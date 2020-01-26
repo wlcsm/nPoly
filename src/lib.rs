@@ -3,176 +3,319 @@
 /// can never be empty
 
 use std::fmt;
+#[macro_use] extern crate cached;
+
+/// Polynomial type. 
+/// It is kinda dangerous deriving PartialEq because if the vector of varVec 
+/// appear in two different orders then it will think that they are not equal
+#[derive(Debug, PartialEq)]
+pub struct PolyM {
+    symb  : String,
+    terms : Vec<Multinomial>,
+}
 
 #[derive(Debug, PartialEq)]
-pub struct Poly(Vec<i32>);
+struct Multinomial {
+    norm : Monomial,
+    ext  : Poly,
+}
 
-impl Poly {
-    // Cannot be empty
-    pub fn new(data: Vec<i32>) -> Result<Poly, &'static str> {
+#[derive(Debug, PartialEq, Clone)]
+struct Monomial {
+    coeff : i32,
+    deg   : usize,
+}
+#[derive(Debug, PartialEq)]
+pub struct PolyU {
+    symb  : String, // A literal for the indeterminates
+    terms : Vec<Monomial>,
+}
 
-        match !data.is_empty() {
-            true  => Ok ( Poly(data.clone()).clean() ),
+#[derive(Debug, PartialEq)]
+#[warn(dead_code)]
+enum Poly {
+    Multi(PolyM),
+    Uni(PolyU),
+}
+
+impl Monomial {
+    fn new(coeff: i32, deg: usize) -> Result<Monomial, &'static str> {
+        // Need to impose some constraints
+        Ok(Monomial { coeff, deg })
+    }
+
+    fn zero() -> Monomial {
+        Monomial::new(0, 0).unwrap()
+    }
+
+    fn one() -> Monomial {
+        Monomial::new(1, 0).unwrap()
+    }
+}
+
+impl PolyU {
+    pub fn from_one_vec_sparse(symb: String, terms: Vec<(i32, usize)>) -> Result<PolyU, &'static str> {
+
+        // TODO Need to check some constraints
+        // Coefficient vector cannot be empty
+        match !terms.is_empty() {
+            true  => Ok ( PolyU {
+                symb,
+                terms: terms.into_iter().map(|(a, b)| Monomial::new(a, b).unwrap()).collect()} ),
             false => Err("Vector to initialise polynomial cannot be empty"),
         }
     }
 
-    pub fn zero() -> Poly {
-        Poly(vec![0])
+    pub fn from_coeff(symb: String, terms: Vec<i32>) -> Result<PolyU, &'static str> {
+
+        // TODO Need to check some constraints
+        // Coefficient vector cannot be empty
+        match !terms.is_empty() {
+            true  => Ok ( PolyU {
+                symb,
+                terms: terms.into_iter().enumerate().map(|(i, c)| Monomial::new(c, i).unwrap()).collect()} ),
+            false => Err("Vector to initialise polynomial cannot be empty"),
+        }
     }
 
-    pub fn one() -> Poly {
-        Poly(vec![1])
+    fn from(symb: String, terms: Vec<Monomial>) -> Result<PolyU, &'static str> {
+
+        // TODO Need to check some constraints
+        // Coefficient vector cannot be empty
+        match !terms.is_empty() {
+            true  => Ok ( PolyU { symb, terms }),
+            false => Err("Vector to initialise polynomial cannot be empty"),
+        }
     }
 
-    pub fn data(&self) -> &Vec<i32> {
-        &self.0
+    // The following two functions should not require a symbol. Its a grey area
+    pub fn zero(symb: String) -> PolyU {
+        PolyU::from(symb, vec![Monomial::zero()]).unwrap()
+    }
+
+    pub fn one(symb: String) -> PolyU {
+        PolyU::from(symb, vec![Monomial::one()]).unwrap()
     }
 
     pub fn deg(&self) -> usize {
-        self.0.len() - 1
+        self.terms.iter().map(|x| x.deg).max().unwrap()
     }
 
-    /// Very badly optimised solution
+    /// Unoptimised solution
     pub fn eval(&self, point: i32) -> i32 {
-        self.0.iter().enumerate().map(|(x, c)| c * int_power(point, x)).sum() 
+        self.terms.iter().map(|x| x.coeff * int_pow(point, x.deg)).sum()
     }
 }
 
-/// Very basic implementation of an exponentiation function.
-/// Just because I couldn't easily find something else.
-fn int_power(base: i32, exp: usize) -> i32 {
-    match exp {
-        0 => 1,
-        1 => base,
-        _ => {
-            let a = int_power(base, exp >> 1);
-            a * a * int_power(base, exp % 2)
-        },
+// A memoised implementation of calculating integer powers
+cached!{
+    INT_POW;
+    // b: base, e: exp
+    fn int_pow(b: i32, e: usize) -> i32 = {
+        match e {
+            0 => 1,
+            1 => b,
+            _ => int_pow(b, e >> 1) * int_pow(b, e >> 1) * int_pow(b, e % 2)
+        }
     }
 }
 
-impl fmt::Display for Poly {
+impl fmt::Display for PolyU {
     
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let sign = |x| { if x < 0 {"-"} else {"+"} };
+        let sign = |x: i32| { if x < 0 {" - "} else {" + "} };
+        // Formats a nomial: Assumes that num is not zero
+        let nomial = |num: &Monomial| -> String {format!("{}{}",
+            if num.coeff.abs() == 1 {"".to_string()}  else {format!("{}", num.coeff.abs())},
+            if num.deg         == 1 {"x".to_string()} else {format!("x^{}", num.deg)}
+        )};
 
-        let mut acc = format!("{}", self.0[0]); // Guaranteed not to be empty
-        if self.0.len() > 1 {
-            acc.push_str(&format!(" {} {}x", sign(self.0[1]), self.0[1].abs()));
-            for (i, el) in (&self.0).into_iter().enumerate().skip(2) {
-                match el.abs() {
-                    0 => continue,
-                    1 => acc.push_str(&format!(" {} x^{}",   sign(*el),    i)),
-                    x => acc.push_str(&format!(" {} {}x^{}", sign(*el), x, i)),
-                }
-            }
-        }
+        // Perform an extra check on the first element.
+        // This is only one where degree can be zero.
+        let mut acc: String =
+            if self.terms[0].deg == 0 {
+                format!("{}", self.terms[0].coeff)
+            } else {
+                nomial(&self.terms[0])
+            };
+
+        self.terms.iter().skip(1)
+                         .for_each(|x|
+                                   acc.push_str(&format!("{}{}", sign(x.coeff),
+                                                         nomial(x))));
+
         write!(f, "{}", acc)
     }
+
 }
 
 
-impl std::str::FromStr for Poly {
-    /// The function to parse a string into a polynomial type
-    type Err = &'static str;
+// impl std::str::FromStr for PolyU {
+//     /// The function to parse a string into a polynomial type
+//     type Err = &'static str;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> { 
-        // Clean and remove square brackets
-        let poly_iter = s[1..].trim()
-                         .trim_matches(|p| p == '[' || p == ']' )
-                         .split(',');
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         // Clean and remove square brackets
+//         let poly_iter = s[1..].trim()
+//                          .trim_matches(|p| p == '[' || p == ']' )
+//                          .split(',');
 
-        // Parse each element into i32.
-        let mut acc: Vec<i32> = Vec::new();
-        for el in poly_iter {
-            let a = el.parse::<i32>()
-                     .expect(format!("Could not parse '{}; as i32", el).as_str());
-            acc.push(a);
-        }
-        Ok(Poly::new(acc).expect("Vector cannot be empty").clean())
-    }
-}
+//         // Parse each element into i32.
+//         let mut acc: Vec<i32> = Vec::new();
+//         for el in poly_iter {
+//             let a = el.parse::<i32>()
+//                      .expect(format!("Could not parse '{}' as i32", el).as_str());
+//             acc.push(a);
+//         }
+//         Ok(PolyU::new(String::from("x"), acc).expect("Vector cannot be empty"))
+//     }
+// }
 
-/// Gets rid of any extra zeros at the end of the vector
-/// Will always leave at least one element in the vector
-impl Poly {
-
-    pub fn is_empty(self) -> bool {
-        self.0.len() == 0
-    }
-
-    fn clean(mut self) -> Self {
-        let mut i = self.0.len() - 1;
-        while self.0[i] == 0 && i > 0 {
-            self.0.pop();
-            i -= 1
-        }
-        self
-    }
-}
-
-/// When benchmarking it would be interesting to see whether an 
-/// implementation with iterators (which would be must smaller code) 
+/// When benchmarking it would be interesting to see whether an
+/// implementation with iterators (which would be much smaller code)
 /// would be faster.
-impl Poly {
+impl PolyU {
     // Generic because I think I might use this kind of operation a lot
-    // Also allows easy generialisation to group elements
-    fn elementwise_binary<F>(&self, other: &Poly, func: F) -> Poly 
+    // Also allows easy generalisation to group elements
+    fn elementwise_binary<F>(&self, other: &PolyU, func: F) -> PolyU 
     where 
         F: Fn(i32, i32) -> i32
     {
-        let (largest, max, min) = if self.deg() > other.deg() {
-            (self, self.deg(), other.deg())
-        } else {
-            (other, other.deg(), self.deg())
-        };
+        let (smol, bigg) =
+            if self.deg() > other.deg() {
+                (&other.terms, &self.terms)
+            } else {
+                (&self.terms, &other.terms)
+            };
 
-        let mut result: Vec<i32> = Vec::with_capacity(max+1);
+        let mut result: Vec<Monomial> = Vec::with_capacity(bigg.len());
 
-        for i in 0..=min {
-            result.push(func(self.0[i], other.0[i]));
+        let mut i = 0;
+
+        for el in smol.iter() {
+            match (el, &bigg[i]) {
+                (x, y) if x.deg <  y.deg => {result.push(x.clone())},
+                (x, y) if x.deg >  y.deg => { while x.deg > bigg[i].deg {
+                    i += 1;
+                    result.push(bigg[i].clone())}
+                },
+                (x, y) if x.deg == y.deg => {
+                    i += 1;
+                    match func(x.coeff, y.coeff) {
+                        0 => (),
+                        a => result.push(Monomial::new(a, x.deg).unwrap()),
+                    }
+                },
+                _ => (),
+            };
         }
-        for i in min+1..=max {
-            result.push(largest.0[i]);
+
+        // Append any remaining terms to the result vector
+        for j in i..bigg.len() {
+            result.push(bigg[j].clone())
+        }
+
+        if result.len() == 0 {
+            result.push(Monomial::zero())
         };
 
-        Poly::new(result).unwrap()
+        PolyU::from(self.symb.clone(), result).unwrap()
     }
     
-    pub fn add(&self, other: &Poly) -> Poly {
-        Poly::elementwise_binary(self, other, |a, b| a + b)
+    pub fn add(&self, other: &PolyU) -> PolyU {
+        PolyU::elementwise_binary(self, other, |a, b| a + b)
     }
 
-    pub fn sub(&self, other: &Poly) -> Poly {
-        Poly::elementwise_binary(self, other, |a, b| a - b)
+    pub fn sub(&self, other: &PolyU) -> PolyU {
+        PolyU::elementwise_binary(self, other, |a, b| a - b)
     }
     
 
     /// A map along the coefficients
-    /// Should ensure that the function is binary.
-    fn elementwise_unary<F>(&self, func: F) -> Poly 
+    /// I havent done the thing which checks if zeros have been introduced
+    fn elementwise_unary<F>(&self, func: F) -> PolyU
     where 
         F: Fn(&i32) -> i32
     {
-        Poly(self.0.iter().map(func).collect())
+        let mut result: Vec<Monomial> = Vec::new();
+        for el in self.terms.iter() {
+            match func(&el.coeff) {
+                0 => (),
+                x => result.push(Monomial::new(x, el.deg).unwrap()),
+            };
+        };
+
+        // Vector cannot be empty
+        if result.len() == 0 {
+            result.push(Monomial::zero())
+        }
+
+        PolyU::from(
+            self.symb.clone(),
+            result,
+        ).unwrap()
     }
 
-    pub fn scale(&self, scalar: i32) -> Poly {
-        self.elementwise_unary(|x| scalar * x).clean()
+    pub fn scale(&self, scalar: i32) -> PolyU {
+        self.elementwise_unary(|x| scalar * x)
     }
 
-    pub fn mul(&self, other: &Poly) -> Poly {
-        let mut result = vec![0; self.deg() + other.deg() + 1];
+    pub fn expand(&self) -> PolyU {
 
-        println!("{}, {}", self.deg(), other.deg());
-        println!("{}", result.len());
+        let mut result: Vec<Monomial> = Vec::new();
+
+        let mut i: usize = 0;
+        for el in self.terms.iter() {
+            if el.deg > i {
+                for j in i..el.deg {
+                    result.push(Monomial::new(0, j).unwrap());
+                };
+                i = el.deg;
+            } else {
+                result.push(el.clone());
+                i += 1;
+            }
+        };
+        PolyU::from(self.symb.clone(), result).unwrap()
+    }
+
+    pub fn compress(&self) -> PolyU {
+        PolyU::from(
+            self.symb.clone(),
+            self.terms.clone().into_iter().filter(|x| x.coeff != 0).collect()
+        ).unwrap()
+    }
+
+    fn to_monomials(acc: &Vec<i32>) -> Vec<Monomial> {
+
+        // Remove the extra zeros when converting to monomial vector
+        let mut result: Vec<Monomial> = Vec::new();
+        for i in 0..acc.len() {
+            match acc[i] {
+                0 => (),
+                x => result.push(Monomial::new(x, i).unwrap()),
+            };
+        }
+        result
+    }
+
+    pub fn mul(&self, other: &PolyU) -> PolyU {
+        let mut acc: Vec<i32> = vec![0; self.deg() + other.deg() + 1];
+
+        let self_exp = &self.expand();
+        let other_exp = &other.expand();
+
         for i in 0..=self.deg() {
             for j in 0..=other.deg() {
-                result[i + j] += self.0[i] * other.0[j];
+                acc[i + j] += self_exp.terms[i].coeff * other_exp.terms[j].coeff;
             } 
         };
-        Poly::new(result).unwrap().clean()
+
+
+        PolyU::from(
+            self.symb.clone(),
+            PolyU::to_monomials(&acc)
+        ).unwrap()
     }
 }
 
@@ -183,40 +326,34 @@ mod tests {
 
     #[test]
     fn basics() {
-        let a = Poly::new(vec![1,2,3]).unwrap();
-        let b = Poly::new(vec![4,5,6]).unwrap();
-        let c = Poly::new(vec![0,0,1,2]).unwrap();
+        let a = PolyU::from_coeff("x".to_string(), vec![1,2,3]).unwrap();
+        let b = PolyU::from_coeff("x".to_string(), vec![4,5,6]).unwrap();
+        let c = PolyU::from_coeff("x".to_string(), vec![0,0,1,2]).unwrap();
 
         // General adding with different lengths
-        assert_eq!(Poly::new(vec![5,7,9]).unwrap(), a.add(&b));
-        assert_eq!(Poly::new(vec![4,5,7,2]).unwrap(), b.add(&c));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![5,7,9]).unwrap(), a.add(&b));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![4,5,7,2]).unwrap(), b.add(&c));
 
         // Testing the cleaning feature
-        assert_eq!(Poly::new(vec![0]).unwrap(), b.sub(&b));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![0]).unwrap(), b.sub(&b));
 
         // Negative numbers
-        assert_eq!(Poly::new(vec![-3,-3,-3]).unwrap(), a.sub(&b));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![-3,-3,-3]).unwrap(), a.sub(&b));
 
         // Scaling
-        assert_eq!(Poly::new(vec![2,4,6]).unwrap(), a.scale(2));
-        assert_eq!(Poly::new(vec![-2,-4,-6]).unwrap(), a.scale(-2));
-        assert_eq!(Poly::new(vec![0]).unwrap(), a.scale(0));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![2,4,6]).unwrap(), a.scale(2));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![-2,-4,-6]).unwrap(), a.scale(-2));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![0]).unwrap(), a.scale(0));
     }
 
     #[test]
     fn multiplication() {
-        let a = Poly::new(vec![1,1]).unwrap();
-        let b = Poly::new(vec![1,2,1]).unwrap();
+        let a = PolyU::from_coeff("x".to_string(), vec![1,1]).unwrap();
+        let b = PolyU::from_coeff("x".to_string(), vec![1,2,1]).unwrap();
 
         // General multiplication
-        assert_eq!(Poly::new(vec![1,2,1]).unwrap(), a.mul(&a));
-        assert_eq!(Poly::new(vec![1,3,3,1]).unwrap(), a.mul(&b));
-
-        // More zeros
-        let c = Poly::new(vec![0,0,1]).unwrap();
-        let d = Poly::new(vec![-1,1]).unwrap();
-        assert_eq!(Poly::new(vec![0,0,1,1]).unwrap(), a.mul(&c));
-        assert_eq!(Poly::new(vec![-1,0,1]).unwrap(), a.mul(&d));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![1,2,1]).unwrap(), a.mul(&a));
+        assert_eq!(PolyU::from_coeff("x".to_string(), vec![1,3,3,1]).unwrap(), a.mul(&b));
     }
 }
 
