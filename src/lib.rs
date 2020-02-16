@@ -68,13 +68,4 @@ mod tests {
         assert_eq!(PolyU::from_coeff("x".to_string(), vec![1,2,1]).unwrap(), a.mul(&a));
         assert_eq!(PolyU::from_coeff("x".to_string(), vec![1,3,3,1]).unwrap(), a.mul(&b));
     }
-
-    // #[test]
-    // fn fft() {
-    //     let a = generate_rou(5);
-    //     println!("Roots of unity: {:?}", a);
-    //     let b = vec![1,2,3];
-    //     let result = super::fft::fft(&b[..]);
-    //     println!("{:?}", result);
-    // }
 }

@@ -1,5 +1,4 @@
 // Taken inspiration from rustyline's error module
-use std::error;
 use std::io;
 use std::fmt;
 use std::num;
@@ -18,17 +17,6 @@ impl fmt::Display for PolyErr {
             PolyErr::EmptyPoly => write!(f, "{}",
                 "Vector to initialise polynomial cannot be empty",),
             PolyErr::Parse(ref err) => err.fmt(f),
-        }
-    }
-}
-
-impl error::Error for PolyErr {
-    fn description(&self) -> &str {
-        match *self {
-            PolyErr::Io(ref err) => err.description(),
-            PolyErr::EmptyPoly =>
-                "Vector to initialise polynomial cannot be empty",
-            PolyErr::Parse(ref err) => err.description(),
         }
     }
 }
