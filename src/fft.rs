@@ -8,7 +8,10 @@ use num_traits::identities::Zero;
 use crate::*;
 use mathutils::*;
 
-pub fn fast_mult(polya: &PolyU, polyb: &PolyU) -> Result<PolyU, &'static str> {
+pub trait Char0: From<f64> {
+}
+
+pub fn fast_mult(polya: &PolyU<i32>, polyb: &PolyU<i32>) -> Result<PolyU<i32>, &'static str> {
     // At the moment, need to round up to the nearest power of two
     let n = next_2pow(polya.deg() + polyb.deg() + 1);
 
@@ -32,10 +35,10 @@ pub fn fast_mult(polya: &PolyU, polyb: &PolyU) -> Result<PolyU, &'static str> {
     let c_parsed = a_sig.into_iter().map(|x| x.re.round() as i32).collect();
 
     // Convert back into polynomial type
-    Ok(PolyU::from_coeff("x".to_string(), c_parsed).unwrap())
+    Ok(PolyU::<i32>::from_coeff("x".to_string(), c_parsed).unwrap())
 }
 
-fn to_coeffs_complex(input: &[Monomial], n: usize) -> Vec<Complex64> {
+fn to_coeffs_complex(input: &[Monomial<i32>], n: usize) -> Vec<Complex64> {
     // Expands the input into the expanded coefficient vector (coerced into complex)
     // Then padded with zeros to length n
 
@@ -159,9 +162,9 @@ mod tests {
         let between = Uniform::from(1..100);
         let mut rng = rand::thread_rng();
         // A function to randomly generate a polynomial with n coefficients
-        let mut make_poly = |n: usize| -> PolyU {
+        let mut make_poly = |n: usize| -> PolyU<i32> {
             let res_vec = (0..n).map(|_| between.sample(&mut rng)).collect();
-            PolyU::from_coeff("x".to_string(), res_vec).unwrap()
+            PolyU::<i32>::from_coeff("x".to_string(), res_vec).unwrap()
         };
 
         // Benches the time required to multiply two arbitrary polynomials of deg = n
@@ -192,21 +195,21 @@ mod tests {
 
     #[test]
     fn mult_test() {
-        let a = PolyU::from_coeff("x".to_string(), vec![1, 1]).unwrap();
-        let b = PolyU::from_coeff("x".to_string(), vec![1, 3]).unwrap();
-        let c = PolyU::from_coeff("x".to_string(), vec![1, 2, 1]).unwrap();
+        let a = PolyU::<i32>::from_coeff("x".to_string(), vec![1, 1]).unwrap();
+        let b = PolyU::<i32>::from_coeff("x".to_string(), vec![1, 3]).unwrap();
+        let c = PolyU::<i32>::from_coeff("x".to_string(), vec![1, 2, 1]).unwrap();
 
         assert_eq!(a.mul(&b), fast_mult(&a, &b).unwrap());
         assert_eq!(b.mul(&c), fast_mult(&b, &c).unwrap());
         assert_eq!(a.mul(&c), fast_mult(&a, &c).unwrap());
 
-        let d = PolyU::from_coeff("x".to_string(), vec![-1, 3]).unwrap();
-        let e = PolyU::from_coeff("x".to_string(), vec![-1, 3, 4, 6]).unwrap();
+        let d = PolyU::<i32>::from_coeff("x".to_string(), vec![-1, 3]).unwrap();
+        let e = PolyU::<i32>::from_coeff("x".to_string(), vec![-1, 3, 4, 6]).unwrap();
 
         assert_eq!(d.mul(&a), fast_mult(&d, &a).unwrap());
         assert_eq!(d.mul(&e), fast_mult(&d, &e).unwrap());
 
-        let f = PolyU::from_coeff("x".to_string(), vec![0]).unwrap();
+        let f = PolyU::<i32>::from_coeff("x".to_string(), vec![0]).unwrap();
 
         assert_eq!(a.mul(&f), fast_mult(&a, &f).unwrap());
     }

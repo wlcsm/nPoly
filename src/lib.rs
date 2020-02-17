@@ -8,26 +8,26 @@
 pub mod error;
 pub mod polyu;
 pub mod polym;
-use polym::PolyM;
+// use polym::PolyM;
 use polyu::PolyU;
 pub mod fft;
 
-#[derive(Debug)]
-pub enum Poly {
-    Multi(PolyM),
-    Uni(PolyU),
-}
+// #[derive(Debug)]
+// pub enum Poly {
+//     Multi(PolyM),
+//     Uni(PolyU),
+// }
 
-#[derive(Debug)]
-pub struct Multinomial {
-    norm : Monomial,
-    ext  : Poly,
-}
+// #[derive(Debug)]
+// pub struct Multinomial {
+//     norm : Monomial,
+//     ext  : Poly,
+// }
 
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Monomial {
-    coeff : i32,
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct Monomial<T: Eq + PartialEq> {
+    coeff : T,
     deg   : usize,
 }
 

@@ -2,4 +2,4 @@
 **/*.rs.bk
 Cargo.lock
 n_poly.md
-archives/*
+archives/**
