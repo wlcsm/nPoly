@@ -3,12 +3,12 @@
 /// can never be empty
 
 // #[macro_use] extern crate log;
-#[macro_use] extern crate cached;
+// #[macro_use] extern crate cached;
 
 pub mod error;
 pub mod polyu;
 pub mod polym;
-// use polym::PolyM;
+pub mod algebras;
 use polyu::PolyU;
 pub mod fft;
 
@@ -25,11 +25,6 @@ pub mod fft;
 // }
 
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Monomial<T: Eq + PartialEq> {
-    coeff : T,
-    deg   : usize,
-}
 
 #[cfg(test)]
 mod tests {
