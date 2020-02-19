@@ -5,7 +5,7 @@ use num_complex::Complex64;
 use crate::algebras::*;
 
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct CC(pub Complex64);
 
 // Approximations for now, I don't acutally use this operation though in the FFT
@@ -18,7 +18,9 @@ impl PartialEq for CC {
 impl Eq for CC {}
 
 impl Group for CC {
-    const zero: Self = CC(Complex64::new(0.0, 0.0));
+    fn zero() -> Self {
+        CC(Complex64::new(0.0, 0.0))
+    }
 }
 
 impl Mul for CC {
@@ -35,6 +37,14 @@ impl MulAssign<Self> for CC {
     }
 }
 
+impl Mul<i32> for CC {
+    type Output = Self;
+
+    fn mul(self, rhs: i32) -> CC {
+        CC(self.0 * rhs as f64)
+    }
+}
+
 impl Div<i32> for CC {
     type Output = Self;
 
@@ -44,8 +54,14 @@ impl Div<i32> for CC {
 }
 
 impl DivAssign<i32> for CC {
-    fn div_assign(self, rhs: i32) -> Self {
-        CC(self.0 / rhs as f64)
+    fn div_assign(&mut self, rhs: i32) {
+        self.0 /= rhs as f64
+    }
+}
+
+impl MulAssign<i32> for CC {
+    fn mul_assign(&mut self, scalar: i32) {
+        self.0 *= scalar as f64
     }
 }
 
@@ -74,5 +90,7 @@ impl Sub for CC {
 }
 
 impl Ring for CC {
-    const one: CC = CC(Complex64::new(1.0, 0.0));
+    fn one() -> Self {
+        CC(Complex64::new(1.0, 0.0))
+    }
 }

@@ -1,66 +1,40 @@
-/// The polynomial structure
-/// One core feature I'd like to enforce is that the vector in the polynomial
-/// can never be empty
+/// The polynomial crate
 
 // #[macro_use] extern crate log;
-// #[macro_use] extern crate cached;
 
 pub mod error;
 pub mod polyu;
 pub mod polym;
 pub mod algebras;
-use polyu::PolyU;
 pub mod fft;
 
-// #[derive(Debug)]
-// pub enum Poly {
-//     Multi(PolyM),
-//     Uni(PolyU),
-// }
-
-// #[derive(Debug)]
-// pub struct Multinomial {
-//     norm : Monomial,
-//     ext  : Poly,
-// }
 
 
 
 #[cfg(test)]
 mod tests {
 
-    use super::PolyU;
-    // use super::fft::generate_rou;
+    use super::polyu::*;
 
     #[test]
     fn basics() {
-        let a = PolyU::from_coeff("x".to_string(), vec![1,2,3]).unwrap();
-        let b = PolyU::from_coeff("x".to_string(), vec![4,5,6]).unwrap();
-        let c = PolyU::from_coeff("x".to_string(), vec![0,0,1,2]).unwrap();
+        let a = PolyU::from_coeff(None, vec![1,2,3]).unwrap();
+        let b = PolyU::from_coeff(None, vec![4,5,6]).unwrap();
+        let c = PolyU::from_coeff(None, vec![0,0,1,2]).unwrap();
 
         // General adding with different lengths
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![5,7,9]).unwrap(), a.add(&b));
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![4,5,7,2]).unwrap(), b.add(&c));
+        assert_eq!(PolyU::from_coeff(None, vec![5,7,9]).unwrap(), a.clone() + b.clone());
+        assert_eq!(PolyU::from_coeff(None, vec![4,5,7,2]).unwrap(), b.clone() + c.clone());
 
         // Testing the cleaning feature
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![0]).unwrap(), b.sub(&b));
+        assert_eq!(PolyU::from_coeff(None, vec![0]).unwrap(), b.clone() - b.clone());
 
         // Negative numbers
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![-3,-3,-3]).unwrap(), a.sub(&b));
+        assert_eq!(PolyU::from_coeff(None, vec![-3,-3,-3]).unwrap(), a.clone() - b.clone());
 
         // Scaling
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![2,4,6]).unwrap(), a.scale(2));
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![-2,-4,-6]).unwrap(), a.scale(-2));
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![0]).unwrap(), a.scale(0));
-    }
-
-    #[test]
-    fn multiplication() {
-        let a = PolyU::from_coeff("x".to_string(), vec![1,1]).unwrap();
-        let b = PolyU::from_coeff("x".to_string(), vec![1,2,1]).unwrap();
-
-        // General multiplication
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![1,2,1]).unwrap(), a.mul(&a));
-        assert_eq!(PolyU::from_coeff("x".to_string(), vec![1,3,3,1]).unwrap(), a.mul(&b));
+        assert_eq!(PolyU::from_coeff(None, vec![2,4,6]).unwrap(), a.clone() * 2);
+        assert_eq!(PolyU::from_coeff(None, vec![-2,-4,-6]).unwrap(), a.clone() * -2);
+        assert_eq!(PolyU::from_coeff(None, vec![0]).unwrap(), a.clone() * 0);
     }
 }
