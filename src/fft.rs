@@ -6,11 +6,12 @@ use num_complex::Complex64;
 use mathutils::*;
 use crate::algebras::*;
 use crate::algebras::complex::*;
+use crate::algebras::integers::*;
 use crate::polyu::*;
 use std::f64::consts::PI;
 
 pub trait FastMult: Group {
-    fn fast_mult(self, b: Self) -> Self;
+    fn fast_mult(&self, b: &Self) -> Self;
 }
 
 pub trait SupportsFFT: Ring + Copy {
@@ -20,7 +21,7 @@ pub trait SupportsFFT: Ring + Copy {
 
 impl FastMult for PolyU<CC> {
 
-    fn fast_mult(self, other: Self) -> Self {
+    fn fast_mult(&self, other: &Self) -> Self {
 
         let n = next_2pow(self.deg() + other.deg() + 1);
         let mut a_sig = to_coeffs(&self.terms[..], n);
@@ -29,14 +30,19 @@ impl FastMult for PolyU<CC> {
         // Infix on a_sig
         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
 
+        // Need to normalise it here
+        for x in a_sig.iter_mut() {
+            x.0 /= n as f64
+        }
+
         // Convert back into polynomial type
         PolyU::from_coeff(None, a_sig).unwrap()
     }
 }
 
-impl FastMult for PolyU<i32> {
+impl FastMult for PolyU<ZZ> {
 
-    fn fast_mult(self, other: Self) -> Self {
+    fn fast_mult(&self, other: &Self) -> Self {
 
         let n = next_2pow(self.deg() + other.deg() + 1);
         let mut a_sig = to_coeffs_complex(&self.terms[..], n);
@@ -45,7 +51,11 @@ impl FastMult for PolyU<i32> {
         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
 
         // Because we converted it to complex for the ROU
-        let c_parsed = a_sig.into_iter().map(|x| x.0.re.round() as i32).collect();
+        // We also need to normalise it here
+        let c_parsed = a_sig.into_iter()
+                            .map(|x| 
+                                ZZ((x.0 / n as f64).re.round() as i32)
+                            ).collect();
 
         // Convert back into polynomial type
         PolyU::from_coeff(None, c_parsed).unwrap()
@@ -80,7 +90,7 @@ pub fn eval_interp<T>(a_sig: &mut [T], b_sig: &mut [T]) -> Result<(), &'static s
 
     // Multiply elementwise
     for i in 0..n {
-        a_sig[i] *= b_sig[i];
+        a_sig[i].mul_ass(&b_sig[i]);
     }
 
     // Interpolate the result
@@ -88,7 +98,7 @@ pub fn eval_interp<T>(a_sig: &mut [T], b_sig: &mut [T]) -> Result<(), &'static s
     Ok(())
 }
 
-fn to_coeffs_complex(input: &[Monomial<i32>], n: usize) -> Vec<CC> {
+fn to_coeffs_complex(input: &[Monomial<ZZ>], n: usize) -> Vec<CC> {
     // Expands the input into the expanded coefficient vector (coerced into complex)
     // Then padded with zeros to length n
 
@@ -96,7 +106,7 @@ fn to_coeffs_complex(input: &[Monomial<i32>], n: usize) -> Vec<CC> {
     for mono in input.into_iter() {
         // Fill the gap between monomials with zeros, then add the monomial
         result.resize(mono.deg, CC::zero());
-        result.push(CC(Complex64::new(mono.coeff as f64, 0.0)));
+        result.push(CC(Complex64::new(mono.coeff.0 as f64, 0.0)));
     }
     // Pad the rest
     result.resize(n, CC::zero());
@@ -119,8 +129,8 @@ fn to_coeffs<T: SupportsFFT>(input: &[Monomial<T>], n: usize) -> Vec<T> {
 }
 
 fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool) -> Result<(), &'static str> {
-    // Sample is the signal. Note that is fully expanded,
-    // Performs the FFT inline
+    // Sample is the signal. Performs the FFT inline
+    // Does not normalise the inverse!
 
     // Basic contraint checking
     match signal.len() {
@@ -129,8 +139,8 @@ fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool) -> Result<(), &'stat
         2 => {
             let x0 = signal[0];
             let x1 = signal[1];
-            signal[0] = x0 + x1;
-            signal[1] = x0 - x1;
+            signal[0] = x0.add(&x1);
+            signal[1] = x0.sub(&x1);
             Ok(())
         },
         n if !is_2_pow(n) => Err("Signal needs to be a power of two"),
@@ -153,10 +163,10 @@ fn go_fast<T: SupportsFFT>(signal: &mut [T], inv: bool) {
         let x_0_n2    = signal[j];
         let x_1       = signal[i + 1];
         let x_1_n2    = signal[j + 1];
-        signal[j]     = x_1 + x_1_n2;
-        signal[i]     = x_0 + x_0_n2;
-        signal[i + 1] = x_0 - x_0_n2;
-        signal[j + 1] = x_1 - x_1_n2;
+        signal[j]     = x_1.add(&x_1_n2);
+        signal[i]     = x_0.add(&x_0_n2);
+        signal[i + 1] = x_0.sub(&x_0_n2);
+        signal[j + 1] = x_1.sub(&x_1_n2);
     }
     // We now assume the first layer is done and reverse bit order satisfied
 
@@ -168,16 +178,10 @@ fn go_fast<T: SupportsFFT>(signal: &mut [T], inv: bool) {
             // Width of the k-flutter (number of elements)
             for (k, l) in (j..j + (flut >> 1)).zip(j + (flut >> 1)..j + flut) {
                 let a = signal[k];
-                let rou_b = rou[(k % flut) * (n >> i)] * signal[l]; // w^j * b
-                signal[k] = a + rou_b; // a + w^j * b
-                signal[l] = a - rou_b; // a + w^{j + n/2} * b
+                let rou_b = rou[(k % flut) * (n >> i)].mul(&signal[l]); // w^j * b
+                signal[k] = a.add(&rou_b); // a + w^j * b
+                signal[l] = a.sub(&rou_b); // a + w^{j + n/2} * b
             }
-        }
-    }
-    // Normalize if calculating the inverse DFT
-    if inv {
-        for el in signal.iter_mut() {
-            *el /= n as i32;
         }
     }
 }
@@ -216,9 +220,9 @@ mod tests {
         let between = Uniform::from(1..100);
         let mut rng = rand::thread_rng();
         // A function to randomly generate a polynomial with n coefficients
-        let mut make_poly = |n: usize| -> PolyU<i32> {
-            let res_vec = (0..n).map(|_| between.sample(&mut rng)).collect();
-            PolyU::<i32>::from_coeff(None, res_vec).unwrap()
+        let mut make_poly = |n: usize| -> PolyU<ZZ> {
+            let res_vec = (0..n).map(|_| ZZ(between.sample(&mut rng))).collect();
+            PolyU::from_coeff(None, res_vec).unwrap()
         };
 
         // Benches the time required to multiply two arbitrary polynomials of deg = n
@@ -231,7 +235,7 @@ mod tests {
             println!("-------------------------------------------");
             println!("FFT: {:?}",
                 Duration::span(|| {
-                    a.fast_mult(b);
+                    a.fast_mult(&b);
                 })
             );
             println!("-------------------------------------------");
@@ -249,22 +253,22 @@ mod tests {
 
     #[test]
     fn mult_test() {
-        let a = PolyU::<i32>::from_coeff(None, vec![1, 1]).unwrap();
-        let b = PolyU::<i32>::from_coeff(None, vec![1, 3]).unwrap();
-        let c = PolyU::<i32>::from_coeff(None, vec![1, 2, 1]).unwrap();
+        let a = PolyU::from_coeff(None, vec![ZZ(1), ZZ(1)]).unwrap();
+        let b = PolyU::from_coeff(None, vec![ZZ(1), ZZ(3)]).unwrap();
+        let c = PolyU::from_coeff(None, vec![ZZ(1), ZZ(2), ZZ(1)]).unwrap();
 
-        assert_eq!(a.clone() * b.clone(), a.clone().fast_mult(b.clone()));
-        assert_eq!(b.clone() * c.clone(), b.clone().fast_mult(c.clone()));
-        assert_eq!(c.clone() * a.clone(), c.clone().fast_mult(a.clone()));
+        assert_eq!(a.mul(&b), a.fast_mult(&b));
+        assert_eq!(b.mul(&c), b.fast_mult(&c));
+        assert_eq!(c.mul(&a), c.fast_mult(&a));
 
-        let d = PolyU::<i32>::from_coeff(None, vec![-1, 3]).unwrap();
-        let e = PolyU::<i32>::from_coeff(None, vec![-1, 3, 4, 6]).unwrap();
+        let d = PolyU::from_coeff(None, vec![ZZ(-1), ZZ(3)]).unwrap();
+        let e = PolyU::from_coeff(None, vec![ZZ(-1), ZZ(3), ZZ(4), ZZ(6)]).unwrap();
 
-        assert_eq!(d.clone() * a.clone(), d.clone().fast_mult(a.clone()));
-        assert_eq!(d.clone() * e.clone(), d.clone().fast_mult(e.clone()));
+        assert_eq!(d.mul(&a), d.fast_mult(&a));
+        assert_eq!(d.mul(&e), d.fast_mult(&e));
 
-        let f = PolyU::<i32>::from_coeff(None, vec![0]).unwrap();
+        let f = PolyU::from_coeff(None, vec![ZZ(0)]).unwrap();
 
-        assert_eq!(f.clone() * a.clone(), f.clone().fast_mult(a.clone()));
+        assert_eq!(f.mul(&a), f.fast_mult(&a));
     }
 }

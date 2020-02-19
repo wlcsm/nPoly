@@ -1,4 +1,3 @@
-
 extern crate num_complex;
 
 use num_complex::Complex64;
@@ -17,80 +16,65 @@ impl PartialEq for CC {
 
 impl Eq for CC {}
 
+impl AlgAdd for CC {
+    fn add(&self, other: &Self) -> Self {
+        CC(self.0 + other.0)
+    }
+}
+
+impl AlgAddAssign for CC {
+    fn add_ass(&mut self, other: &Self) {
+        self.0 += other.0
+    }
+}
+
+impl AlgSub for CC {
+    fn sub(&self, other: &Self) -> Self {
+        CC(self.0 - other.0)
+    }
+}
+
+impl AlgSubAssign for CC {
+    fn sub_ass(&mut self, other: &Self) {
+        self.0 -= other.0
+    }
+}
+
+impl AlgNeg for CC {
+    fn neg(&self) -> Self {
+        CC(-self.0)
+    }
+}
+
 impl Group for CC {
     fn zero() -> Self {
         CC(Complex64::new(0.0, 0.0))
     }
 }
 
-impl Mul for CC {
-    type Output = Self;
-     
-    fn mul(self, other: Self) -> Self {
+impl AlgMul for CC {
+    fn mul(&self, other: &Self) -> Self {
         CC(self.0 * other.0)
     }
 }
 
-impl MulAssign<Self> for CC {
-    fn mul_assign(&mut self, rhs: Self) {
-        self.0 *= rhs.0;
-    }
-}
-
-impl Mul<i32> for CC {
-    type Output = Self;
-
-    fn mul(self, rhs: i32) -> CC {
-        CC(self.0 * rhs as f64)
-    }
-}
-
-impl Div<i32> for CC {
-    type Output = Self;
-
-    fn div(self, rhs: i32) -> Self::Output {
-        CC(self.0 / rhs as f64)
-    }
-}
-
-impl DivAssign<i32> for CC {
-    fn div_assign(&mut self, rhs: i32) {
-        self.0 /= rhs as f64
-    }
-}
-
-impl MulAssign<i32> for CC {
-    fn mul_assign(&mut self, scalar: i32) {
-        self.0 *= scalar as f64
-    }
-}
-
-impl Neg for CC {
-    type Output = CC;
-
-    fn neg(self) -> Self::Output {
-        CC(-self.0)
-    }
-}
-
-impl Add for CC {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        CC(self.0 + other.0)
-    }
-}
-
-impl Sub for CC {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        CC(self.0 - other.0)
+impl AlgMulAssign for CC{
+    fn mul_ass(&mut self, other: &Self) {
+        self.0 *= other.0
     }
 }
 
 impl Ring for CC {
     fn one() -> Self {
         CC(Complex64::new(1.0, 0.0))
+    }
+    type BaseRing = Complex64;
+
+    fn scale(&self, scalar: Self::BaseRing) -> Self {
+        CC(self.0 * scalar)
+    }
+
+    fn scale_ass(&mut self, scalar: Self::BaseRing) {
+        self.0 *= scalar
     }
 }
