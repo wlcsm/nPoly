@@ -10,11 +10,12 @@ use crate::algebras::integers::*;
 use crate::polyu::*;
 use std::f64::consts::PI;
 
-pub trait FastMult: Group {
+pub trait FastMult: Ring {
     fn fast_mult(&self, b: &Self) -> Self;
 }
 
-pub trait SupportsFFT: Ring + Copy {
+// Only supporting scalar rings at the moment
+pub trait SupportsFFT: ScalarRing {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
 }
@@ -24,8 +25,8 @@ impl FastMult for PolyU<CC> {
     fn fast_mult(&self, other: &Self) -> Self {
 
         let n = next_2pow(self.deg() + other.deg() + 1);
-        let mut a_sig = to_coeffs(&self.terms[..], n);
-        let mut b_sig = to_coeffs(&other.terms[..], n);
+        let mut a_sig = expand(&self.terms[..], n);
+        let mut b_sig = expand(&other.terms[..], n);
 
         // Infix on a_sig
         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
@@ -98,7 +99,7 @@ pub fn eval_interp<T>(a_sig: &mut [T], b_sig: &mut [T]) -> Result<(), &'static s
     Ok(())
 }
 
-fn to_coeffs_complex(input: &[Monomial<ZZ>], n: usize) -> Vec<CC> {
+fn to_coeffs_complex(input: &[MonomialU<ZZ>], n: usize) -> Vec<CC> {
     // Expands the input into the expanded coefficient vector (coerced into complex)
     // Then padded with zeros to length n
 
@@ -113,20 +114,6 @@ fn to_coeffs_complex(input: &[Monomial<ZZ>], n: usize) -> Vec<CC> {
     result
 }
 
-fn to_coeffs<T: SupportsFFT>(input: &[Monomial<T>], n: usize) -> Vec<T> {
-    // Expands the input into the expanded coefficient vector (coerced into complex)
-    // Then padded with zeros to length n
-
-    let mut result: Vec<T> = Vec::with_capacity(n);
-    for mono in input.into_iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(mono.deg, <T>::zero());
-        result.push(mono.coeff);
-    }
-    // Pad the rest
-    result.resize(n, <T>::zero());
-    result
-}
 
 fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool) -> Result<(), &'static str> {
     // Sample is the signal. Performs the FFT inline

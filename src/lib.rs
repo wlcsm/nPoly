@@ -38,4 +38,20 @@ mod tests {
         assert_eq!(PolyU::from_coeff(None, vec![ZZ(-2),ZZ(-4),ZZ(-6)]).unwrap(), a.scale(ZZ(-2)));
         assert_eq!(PolyU::from_coeff(None, vec![ZZ(0)]).unwrap(), a.scale(ZZ(0)));
     }
+
+
+    #[test]
+    fn multivariate() {
+        let a = PolyU::from_coeff(Some("x"), vec![ZZ(1),ZZ(2),ZZ(3)]).unwrap();
+        let b = PolyU::from_coeff(Some("x"), vec![ZZ(4),ZZ(5),ZZ(6)]).unwrap();
+        let c = PolyU::from_coeff(Some("x"), vec![ZZ(0),ZZ(0),ZZ(1),ZZ(2)]).unwrap();
+
+        let d = PolyM::from_coeff(Some("y"), vec![a.clone(), b.clone()]).unwrap();
+
+        assert_eq!(PolyM::from_coeff(Some("y"), vec![a.add(&a), b.add(&b)]).unwrap(), d.add(&d));
+        println!("{}", d);
+
+        println!("{}", d.mul(&d));
+
+    }
 }
