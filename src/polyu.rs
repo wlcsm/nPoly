@@ -73,7 +73,7 @@ impl<T: Group> PolyU<T> {
     // TODO this fails in the multivariate case, unless we have a grelex
     // monomial ordering
     pub fn deg(&self) -> usize {
-        self.terms[self.terms.len()].deg
+        self.terms[self.terms.len() - 1].deg
     }
 }
 
