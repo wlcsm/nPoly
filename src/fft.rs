@@ -10,11 +10,11 @@ use crate::algebras::integers::*;
 use crate::polyu::*;
 use std::f64::consts::PI;
 
-pub trait FastMult: Group {
+pub trait FastMult: Ring {
     fn fast_mult(&self, b: &Self) -> Self;
 }
 
-pub trait SupportsFFT: Ring + Copy {
+pub trait SupportsFFT: ScalarRing {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
 }
@@ -260,6 +260,7 @@ mod tests {
         assert_eq!(a.mul(&b), a.fast_mult(&b));
         assert_eq!(b.mul(&c), b.fast_mult(&c));
         assert_eq!(c.mul(&a), c.fast_mult(&a));
+        println!{"{:?}", c.fast_mult(&a)}
 
         let d = PolyU::from_coeff(None, vec![ZZ(-1), ZZ(3)]).unwrap();
         let e = PolyU::from_coeff(None, vec![ZZ(-1), ZZ(3), ZZ(4), ZZ(6)]).unwrap();

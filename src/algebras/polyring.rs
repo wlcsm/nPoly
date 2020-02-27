@@ -1,102 +1,71 @@
 use crate::polyu::*;
 use crate::algebras::*;
 
-impl<T: Group> AlgAdd for PolyU<T> {
+impl<T: ScalarRing + std::fmt::Debug> Ring for PolyU<T> {
+    type BaseRing = T;
+    fn is_poly() -> bool { true }
+
     fn add(&self, other: &Self) -> Self {
-        PolyU::elementwise_binary(&self, other, |a, b| a.add(&b))
+        PolyU::elementwise_add(&self, other)
     }
-}
-
-impl<T: Group> AlgAddAssign for PolyU<T> {
-    fn add_ass(&mut self, other: &Self) {
-        PolyU::elementwise_binary_ass(self, other, |a, b| a.add(&b))
-    }
-}
-
-impl<T: Group> AlgSub for PolyU<T> {
+    // TODO the negation here is VERY expensive because it is cloning everything 
     fn sub(&self, other: &Self) -> Self {
-        PolyU::elementwise_binary(self, other, |a, b| a.sub(&b))
+        PolyU::elementwise_add(self, &other.neg())
     }
-}
-
-impl<T: Group> AlgSubAssign for PolyU<T> {
-    fn sub_ass(&mut self, other: &Self) {
-        PolyU::elementwise_binary_ass(self, other, |a, b| a.sub(&b))
-    }
-}
-
-impl<T: Group> AlgNeg for PolyU<T> {
     fn neg(&self) -> Self {
         let terms = self.terms.iter().map(|m| m.neg()).collect();
         PolyU::from_monomials(self.symb.clone(), terms).unwrap()
     }
-}
-
-impl<T: Group> Group for PolyU<T> {
     fn zero() -> Self {
-        PolyU { symb: None, terms: vec![Monomial::zero()] }
+        PolyU { symb: None, lead_scalar: <T>::one(), terms: vec![Monomial::zero()] }
     }
-}
-
-
-impl<T: Ring> AlgMul for PolyU<T> {
     fn mul(&self, other: &Self) -> Self {
-        let mut result = vec![<T>::zero(); self.deg() + other.deg() + 1];
+        let mut acc = vec![<T>::zero(); self.deg() + other.deg() + 1];
 
         for a in self.terms.iter() {
             for b in other.terms.iter() {
-                result[a.deg + b.deg].add_ass(&a.coeff.mul(&b.coeff));
+                acc[a.deg + b.deg].add_ass(&a.coeff.mul(&b.coeff));
+            }
+        }
+        // Convert everything to monomials
+        let mut result = Vec::with_capacity(acc.len());
+        for (i, el) in acc.into_iter().enumerate() {
+            if el != <T>::zero() {
+                result.push(Monomial::new(el, i));
             }
         }
 
-        PolyU::from_coeff( self.symb.clone(), result ).unwrap()
+        PolyU::<T> { symb: self.symb.clone(), lead_scalar: <T>::one(), terms: result }
     }
-}
 
-impl<T: Ring> AlgMulAssign for PolyU<T>{
-    fn mul_ass(&mut self, other: &Self) {
-        let mut result = self.mul(other);
-        self.terms.clear();
-        self.terms.append(&mut result.terms)
-    }
-}
-
-impl<T: Ring> Ring for PolyU<T> {
     fn one() -> Self {
-        PolyU { symb: None, terms: vec![Monomial::one()] }
+        PolyU { symb: None, lead_scalar: <T>::one(), terms: vec![Monomial::one()] }
     }
-    type BaseRing = T;
+}
 
+impl<T: ScalarRing> PolyRing for PolyU<T> {
     fn scale(&self, scalar: Self::BaseRing) -> Self {
-        if scalar == <T>::zero() {
-            return PolyU::zero()
+        if scalar == <Self::BaseRing>::zero() {
+            PolyU::zero()
+        } else {
+            let mut result = self.clone();
+            result.lead_scalar.mul_ass(&scalar);
+            result
         }
-
-        let result = self.terms.iter()
-                         .map(|x|
-                            Monomial::new(x.coeff.mul(&scalar), x.deg)
-                        ).collect();
-
-        PolyU::from_monomials(
-            self.symb.clone(),
-            result,
-        ).unwrap()
-
     }
     fn scale_ass(&mut self, scalar: Self::BaseRing) {
-        // TODO need to compress if the scalar was zero
-        for x in self.terms.iter_mut() {
-            // Yes I'm doing mul_ass instead of scale_ass
-            x.coeff.mul_ass(&scalar);
+        if scalar == <Self::BaseRing>::zero() {
+            self.terms.clear();
+            self.lead_scalar = <Self::BaseRing>::one();
+        } else {
+            self.lead_scalar.mul_ass(&scalar);
         }
     }
 }
 
-impl<T: Group> PolyU<T> {
+impl<T: ScalarRing> PolyU<T> {
     // TODO This whole thing needs to be redone
-    fn elementwise_binary<F>(polya: &PolyU<T>, polyb: &PolyU<T>, func: F) -> PolyU<T>
-    where
-        F: Fn(T, T) -> T
+    fn elementwise_add(polya: &PolyU<T>, polyb: &PolyU<T>) -> PolyU<T>
     {
         let (smol, bigg) =
             if polya.deg() > polyb.deg() {
@@ -116,7 +85,7 @@ impl<T: Group> PolyU<T> {
                 (x, y) if x.deg >  y.deg => {result.push(y.clone()); j += 1}, 
                 (x, y) if x.deg == y.deg => {
                     i += 1; j += 1;
-                    let a = func(x.coeff.clone(), y.coeff.clone());
+                    let a = x.coeff.add(&y.coeff);
                     if a == <T>::zero() {
                         result.push(Monomial::new(a, x.deg));
                     }
@@ -135,16 +104,5 @@ impl<T: Group> PolyU<T> {
         }
 
         PolyU::from_monomials(polya.symb.clone(), result).unwrap()
-    }
-
-    // Pretty hacky way but okay
-    fn elementwise_binary_ass<F>(polya: &mut PolyU<T>, polyb: &PolyU<T>, func: F)
-    where
-        F: Fn(T, T) -> T
-    {
-        let mut result = PolyU::elementwise_binary(polya, polyb, func);
-
-        polya.terms.clear();
-        polya.terms.append(&mut result.terms);
     }
 }

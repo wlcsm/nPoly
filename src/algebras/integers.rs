@@ -2,69 +2,40 @@ use crate::algebras::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct ZZ(pub i32);
+extern crate num_complex;
 
-impl AlgAdd for ZZ {
+impl Ring for ZZ {
+    type BaseRing = ZZ;
+    fn is_poly() -> bool { false }
+
     fn add(&self, other: &Self) -> Self {
         ZZ(self.0 + other.0)
     }
-}
-
-impl AlgAddAssign for ZZ {
-    fn add_ass(&mut self, other: &Self) {
-        self.0 += other.0
-    }
-}
-
-impl AlgSub for ZZ {
     fn sub(&self, other: &Self) -> Self {
         ZZ(self.0 - other.0)
     }
-}
-
-impl AlgSubAssign for ZZ {
-    fn sub_ass(&mut self, other: &Self) {
-        self.0 -= other.0
-    }
-}
-
-impl AlgNeg for ZZ {
     fn neg(&self) -> Self {
         ZZ(-self.0)
     }
-}
-
-impl Group for ZZ {
-    fn zero() -> Self {ZZ(0)}
-}
-
-impl AlgMul for ZZ {
+    fn zero() -> Self {
+        ZZ(0)
+    }
     fn mul(&self, other: &Self) -> Self {
         ZZ(self.0 * other.0)
     }
+    fn one() -> Self {
+        ZZ(1)
+    }
 }
 
-impl AlgMulAssign for ZZ{
+impl ScalarRing for ZZ {
+    fn add_ass(&mut self, other: &Self) {
+        self.0 += other.0
+    }
+    fn sub_ass(&mut self, other: &Self) {
+        self.0 -= other.0
+    }
     fn mul_ass(&mut self, other: &Self) {
         self.0 *= other.0
-    }
-}
-
-impl Ring for ZZ {
-    fn one() -> Self {ZZ(1)}
-    type BaseRing = i32;
-    fn scale(&self, scalar: Self::BaseRing) -> Self {
-        ZZ(self.0 * scalar)
-    }
-    fn scale_ass(&mut self, scalar: Self::BaseRing) {
-        self.0 *= scalar
-    }
-}
-
-use std::fmt;
-
-impl fmt::Display for ZZ {
-
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
