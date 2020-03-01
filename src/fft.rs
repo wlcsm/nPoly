@@ -163,8 +163,8 @@ fn go_fast<T: SupportsFFT>(signal: &mut [T], inv: bool) {
         let x_0_n2    = signal[j];
         let x_1       = signal[i + 1];
         let x_1_n2    = signal[j + 1];
-        signal[j]     = x_1.add(&x_1_n2);
         signal[i]     = x_0.add(&x_0_n2);
+        signal[j]     = x_1.add(&x_1_n2);
         signal[i + 1] = x_0.sub(&x_0_n2);
         signal[j + 1] = x_1.sub(&x_1_n2);
     }
@@ -260,7 +260,6 @@ mod tests {
         assert_eq!(a.mul(&b), a.fast_mult(&b));
         assert_eq!(b.mul(&c), b.fast_mult(&c));
         assert_eq!(c.mul(&a), c.fast_mult(&a));
-        println!{"{:?}", c.fast_mult(&a)}
 
         let d = PolyU::from_coeff(None, vec![ZZ(-1), ZZ(3)]).unwrap();
         let e = PolyU::from_coeff(None, vec![ZZ(-1), ZZ(3), ZZ(4), ZZ(6)]).unwrap();

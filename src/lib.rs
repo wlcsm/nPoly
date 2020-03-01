@@ -7,7 +7,7 @@ pub mod polyu;
 pub mod polym;
 pub mod algebras;
 pub mod fft;
-
+pub mod base_n_fft;
 
 
 #[cfg(test)]

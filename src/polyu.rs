@@ -5,9 +5,9 @@ type SymbType = Option<String>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct PolyU<T: ScalarRing> {
-    pub symb  : SymbType, // A literal for the indeterminates
+    pub symb        : SymbType, // A literal for the indeterminates
     pub lead_scalar : T,
-    pub terms : Vec<Monomial<T>>,
+    pub terms       : Vec<Monomial<T>>,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
