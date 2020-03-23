@@ -17,6 +17,7 @@ pub trait FastMult: Ring {
 pub trait SupportsFFT: ScalarRing {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
+    fn divby2(self, n: usize) -> Self;
 }
 
 // TODO these two implementations should be one macro
@@ -71,6 +72,10 @@ impl SupportsFFT for CC {
         let sign = if inv { 1.0 } else { -1.0 };
         let base = Complex64::new(0.0, sign * 2.0 * PI / n as f64);
         (0..n).map(|k| CC(base.scale(k as f64).exp())).collect()
+    }
+
+    fn divby2(self, n: usize) -> Self {
+        CC(self.0 / (1 << n) as f64)
     }
 }
 
@@ -150,7 +155,7 @@ pub fn dft<T: SupportsFFT>(signal: &mut [T], inv: bool) {
     }
 }
 
-fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool, m: usize) -> Result<(), &'static str> {
+pub fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool, base: usize) -> Result<(), &'static str> {
     // Sample is the signal. Performs the FFT inline
     // Does not normalise the inverse!
 
@@ -158,7 +163,7 @@ fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool, m: usize) -> Result<
     match signal.len() {
         0 => Err("Signal cannot be empty"),
         n if !is_n_pow(n, 2) => Err("Signal needs to be a power of the base"),
-        p if p == m => {
+        p if p == base => {
             dft(signal, inv);
             Ok(())
         },
@@ -210,10 +215,10 @@ mod base_2_fft {
 }
 
 
-mod base_n_fft {
+pub mod base_n_fft {
     use super::*;
 
-    fn go_fast_base_n<T: SupportsFFT>(sig: &mut [T], inv: bool, m: usize) {
+    pub fn go_fast_base_n<T: SupportsFFT>(sig: &mut [T], inv: bool, m: usize) {
         // Assumes that the length of 'signal' is >= 4
 
         let n   = sig.len();
@@ -262,10 +267,10 @@ mod base_n_fft {
 
 // Don't think this abstraction is really necessary but I like the organisation
 // I didn't idiot proof these so it is easy to break them with edge cases
-mod mathutils {
+pub mod mathutils {
     // Rounds down
-    pub fn logn(num: usize, m: usize) -> usize { 
-        if num < m { 0 } else {logn(num / m, m) + 1}
+    pub fn logn(num: usize, n: usize) -> usize { 
+        if num < n { 0 } else {logn(num / n, n) + 1}
     }
 
     pub fn is_n_pow(num: usize, m: usize) -> bool {
@@ -324,7 +329,8 @@ mod tests {
             println!("-------------------------------------------");
             println!("FFT: {:?}",
                 Duration::span(|| {
-                    a.fast_mult(&b, 2);
+                    // a.fast_mult(&b, 2);
+                    a.mul(&b);
                 })
             );
             println!("-------------------------------------------");
@@ -338,6 +344,8 @@ mod tests {
         time_mult(1 << 11);
         time_mult(1 << 12);
         time_mult(1 << 13);
+        time_mult(1 << 14);
+        time_mult(1 << 15);
     }
 
     #[test]

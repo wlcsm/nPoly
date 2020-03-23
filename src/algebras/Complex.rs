@@ -7,6 +7,18 @@ use crate::algebras::*;
 #[derive(Clone, Copy, Debug)]
 pub struct CC(pub Complex64);
 
+impl CC {
+    pub fn new(val: Complex64) -> CC {
+        CC(val)
+    }
+    pub fn from_re(val: i32) -> CC {
+        CC(Complex64::new(val as f64, 0.0))
+    }
+
+    pub fn from_im(val: i32) -> CC {
+        CC(Complex64::new(0.0, val as f64))
+    }
+}
 // Approximations for now, I don't acutally use this operation though in the FFT
 impl PartialEq for CC {
     fn eq(&self, other: &Self) -> bool {
