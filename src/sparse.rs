@@ -87,10 +87,10 @@ fn revbit<T: SupportsFFT>(input: &PolyU<T>, n: usize) -> Vec<Subtree<T>> {
 
     // Makes each element a subtree (inefficient I know)
     let mut result: Vec<Subtree<T>> 
-        = input.terms.iter().map(|x| Subtree { 
-                                        coeffs: vec![x.coeff],
+        = input.terms.iter().map(|(c, d)| Subtree { 
+                                        coeffs: vec![c],
                                         pos   : Position {
-                                            path  : revbits(x.deg as u32) as u32,
+                                            path  : revbits(d as u32) as u32,
                                             depth : 0
                                         }
                                     }
@@ -163,7 +163,7 @@ mod tests {
     fn whole() {
         let a = PolyU::from_coeff(None, vec![CC::from_re(1),CC::from_re(2),CC::from_re(3)]).unwrap();
         let b = a.clone();
-        let mut b_coeffs: Vec<CC> = b.terms.into_iter().map(|a| a.coeff).collect();
+        let mut b_coeffs: Vec<CC> = b.terms.iter().map(|a| a.0).collect();
         b_coeffs.push(CC::from_re(0));
         perform_fft(&mut b_coeffs[..], false, 2).unwrap();
         let res = sparse_eval(a, 2);

@@ -1,82 +1,13 @@
 extern crate chrono;
-extern crate num_complex;
 
-use num_complex::Complex64;
-
-use mathutils::*;
+use crate::mathutils::*;
 use crate::algebras::*;
-use crate::algebras::complex::*;
-use crate::algebras::integers::*;
-use crate::polyu::*;
-use std::f64::consts::PI;
 
-pub trait FastMult: Ring {
-    fn fast_mult(&self, b: &Self, m: usize) -> Self;
-}
 
 pub trait SupportsFFT: ScalarRing {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
     fn divby2(self, n: usize) -> Self;
-}
-
-// TODO these two implementations should be one macro
-impl FastMult for PolyU<CC> {
-
-    fn fast_mult(&self, other: &Self, m: usize) -> Self {
-
-        let n = next_npow(self.deg() + other.deg() + 1, m);
-        let mut a_sig = to_coeffs(&self.terms[..], n);
-        let mut b_sig = to_coeffs(&other.terms[..], n);
-
-        // Infix on a_sig
-        eval_interp(&mut a_sig[..], &mut b_sig[..], m).unwrap();
-
-        // Need to normalise it here
-        for x in a_sig.iter_mut() {
-            x.0 /= n as f64
-        }
-
-        // Convert back into polynomial type
-        PolyU::from_coeff(None, a_sig).unwrap()
-    }
-}
-
-impl FastMult for PolyU<ZZ> {
-
-    fn fast_mult(&self, other: &Self, m: usize) -> Self {
-
-        let n = next_npow(self.deg() + other.deg() + 1, m);
-        let mut a_sig = to_coeffs_complex(&self.terms[..], n);
-        let mut b_sig = to_coeffs_complex(&other.terms[..], n);
-
-        eval_interp(&mut a_sig[..], &mut b_sig[..], m).unwrap();
-
-        // Because we converted it to complex for the ROU
-        // We also need to normalise it here
-        let c_parsed = a_sig.into_iter()
-                            .map(|x| 
-                                ZZ((x.0 / n as f64).re.round() as i32)
-                            ).collect();
-
-        // Convert back into polynomial type
-        PolyU::from_coeff(None, c_parsed).unwrap()
-    }
-}
-
-impl SupportsFFT for CC {
-
-    fn rou(n: usize, inv: bool) -> Vec<Self> {
-        // Generates all the nth roots of unity
-        // Changes it depending on whether computing the dft or the inverse
-        let sign = if inv { 1.0 } else { -1.0 };
-        let base = Complex64::new(0.0, sign * 2.0 * PI / n as f64);
-        (0..n).map(|k| CC(base.scale(k as f64).exp())).collect()
-    }
-
-    fn divby2(self, n: usize) -> Self {
-        CC(self.0 / (1 << n) as f64)
-    }
 }
 
 // Warning: Does it infix by default for speed, infix on a_sig
@@ -104,36 +35,6 @@ pub fn eval_interp<T>(a_sig: &mut [T], b_sig: &mut [T], m: usize) -> Result<(), 
     Ok(())
 }
 
-// TODO these two should also be a macro
-fn to_coeffs_complex(input: &[Monomial<ZZ>], n: usize) -> Vec<CC> {
-    // Expands the input into the expanded coefficient vector (coerced into complex)
-    // Then padded with zeros to length n
-
-    let mut result: Vec<CC> = Vec::with_capacity(n);
-    for mono in input.into_iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(mono.deg, CC::zero());
-        result.push(CC(Complex64::new(mono.coeff.0 as f64, 0.0)));
-    }
-    // Pad the rest
-    result.resize(n, CC::zero());
-    result
-}
-
-fn to_coeffs<T: SupportsFFT>(input: &[Monomial<T>], n: usize) -> Vec<T> {
-    // Expands the input into the expanded coefficient vector (coerced into complex)
-    // Then padded with zeros to length n
-
-    let mut result: Vec<T> = Vec::with_capacity(n);
-    for mono in input.into_iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(mono.deg, <T>::zero());
-        result.push(mono.coeff);
-    }
-    // Pad the rest
-    result.resize(n, <T>::zero());
-    result
-}
 
 pub fn dft<T: SupportsFFT>(signal: &mut [T], inv: bool) {
 
@@ -149,7 +50,7 @@ pub fn dft<T: SupportsFFT>(signal: &mut [T], inv: bool) {
     // F(k) = \sum^n_{j=0} x_j e^{-2\pi i jk / n}
     for k in 0..n {
         let term: T = result.iter().enumerate()
-                                    .map(|(i,c)| rou[modx(k, i)].mul(c))
+                                    .map(|(i, c)| rou[modx(k, i)].mul(c))
                                     .fold(<T>::zero(), |a, b| a.add(&b));
         signal[k] = term;
     }
@@ -265,39 +166,6 @@ pub mod base_n_fft {
     }
 }
 
-// Don't think this abstraction is really necessary but I like the organisation
-// I didn't idiot proof these so it is easy to break them with edge cases
-pub mod mathutils {
-    // Rounds down
-    pub fn logn(num: usize, n: usize) -> usize { 
-        if num < n { 0 } else {logn(num / n, n) + 1}
-    }
-
-    pub fn is_n_pow(num: usize, m: usize) -> bool {
-        if m == 2{
-            (num - 1) & num == 0
-        } else {
-            pow(m, logn(num, m)) == num 
-        }
-    }
-
-    pub fn next_npow(num: usize, n: usize) -> usize {
-        if is_n_pow(num, n) { num } else { pow(n, logn(num, n) + 1) }
-    }
-
-    // Exponentiation function: n^exp
-    pub fn pow(n: usize, exp: usize) -> usize {
-        if n == 2 {
-            1 << exp
-        } else {
-            match exp {
-                0 => 1,
-                1 => n,
-                e => pow(n, e / 2) * pow(n, e / 2) * (if e % 2 == 0 {1} else {n})
-            }
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -305,6 +173,9 @@ mod tests {
     extern crate rand;
     use super::*;
     use chrono::*;
+    use crate::fast_mult::*;
+    use crate::algebras::integers::ZZ;
+    use crate::polyu::*;
 
     use rand::distributions::{Distribution, Uniform};
 
@@ -329,23 +200,15 @@ mod tests {
             println!("-------------------------------------------");
             println!("FFT: {:?}",
                 Duration::span(|| {
-                    // a.fast_mult(&b, 2);
-                    a.mul(&b);
+                    a.fast_mult(&b, 2);
                 })
             );
             println!("-------------------------------------------");
         };
 
-        time_mult(1 << 3);
-        time_mult(1 << 4);
-        time_mult(1 << 6);
-        time_mult(1 << 8);
-        time_mult(1 << 10);
-        time_mult(1 << 11);
-        time_mult(1 << 12);
-        time_mult(1 << 13);
-        time_mult(1 << 14);
-        time_mult(1 << 15);
+        for i in 5..16 {
+            time_mult(1 << i);
+        }
     }
 
     #[test]

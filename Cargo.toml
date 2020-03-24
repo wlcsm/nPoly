@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Will Cashman <wcashman1351@gmail.com>"]
 edition = "2018"
 
+# [profile.test] 
+# opt-level = 3
+
 [dependencies]
 cached = "0.11.0"
 num-complex = "0.2.4"

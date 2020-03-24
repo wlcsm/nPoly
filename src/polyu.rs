@@ -5,132 +5,138 @@ type SymbType = Option<String>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct PolyU<T: ScalarRing> {
-    pub symb        : SymbType, // A literal for the indeterminates
-    pub lead_scalar : T,
-    pub terms       : Vec<Monomial<T>>,
+    pub(crate) symb  : SymbType, // A literal for the indeterminates
+    pub(crate) terms : Monomials<T>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Monomial<T: ScalarRing> {
-    pub coeff : T,
-    pub deg   : usize,
+pub(crate) struct Monomials<T: ScalarRing> {
+    pub(crate) lead_scalar: T,
+    coeffs : Vec<T>,
+    degs   : Vec<usize>,
 }
 
-impl<T: ScalarRing> Monomial<T> {
-    pub fn zero() -> Self {
-        Monomial { coeff: <T>::zero(), deg: 0 }
-    } 
-    pub fn one() -> Self {
-        Monomial { coeff: <T>::one(), deg: 0 }
-    } 
-    pub fn new(coeff: T, deg: usize) -> Monomial<T> {
-        Monomial { coeff, deg }
+pub(crate) struct MonomialsIter<'a, T: ScalarRing> {
+    data: &'a Monomials<T>,
+    index: usize,
+}
+
+impl<'a, T: ScalarRing> Iterator for MonomialsIter<'a, T> {
+
+    type Item = (T, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let i = self.index;
+        match (self.data.coeffs.get(i), self.data.degs.get(i)) {
+            (Some(c), Some(d)) => {
+                self.index += 1;
+                Some((*c, *d))
+            },
+            (_, _) => None
+        }
     }
-    pub fn neg(&self) -> Self {
-        Monomial::new(self.coeff.neg(), self.deg)
+}
+impl<'a, T: ScalarRing> Monomials<T> {
+    pub(crate) fn iter(&'a self) -> MonomialsIter<'a, T> {
+        MonomialsIter {
+            data: self,
+            index: 0
+        }
     }
 }
 
-// impl<T: ScalarRing> Coeff<T> {
-//     // Adds a scalar and a polynomial quickly
-//     fn s_plus_p(scalar: T, poly: PolyU<T>) -> PolyU<T> {
-//         poly.add(&PolyU::from_coeff(None, vec![scalar]).unwrap())
-//     }
-//     // Checks if a poly could be compressed into a scalar. However I think this will
-//     // have more performance loss than simply not checking
-//     fn from(poly: PolyU<T>) -> Coeff<T> {
-//         if poly.terms.len() <= 1 {
-//             if poly.terms[0].deg == 0 {
-//                 if let Coeff::S(n) = poly.terms[0].coeff {
-//                     return Coeff::S(n.mul(&poly.lead_scalar))
-//                 }
-//             }
-//         }
-//         Coeff::P(poly)
-//     }
-//     pub fn add_ass(&mut self, other: &Self) {
-//         match (self, other) {
-//            (Coeff::S(s1), Coeff::S(s2)) => s1.add_ass(s2),
-//            (Coeff::S(s1), Coeff::P(p2)) => {self = &mut Coeff::P(Coeff::s_plus_p(*s1,*p2));},
-//            (Coeff::P(p1), Coeff::S(s2)) => {self = &mut Coeff::P(Coeff::s_plus_p(*s2,*p1))},
-//            (Coeff::P(p1), Coeff::P(p2)) => {self = &mut Coeff::P(p1.add(p2))},
-//         }
-//     }
-// }
 
-// impl<T: ScalarRing> Ring for Coeff<T> {
+impl<T: ScalarRing> Monomials<T> {
+    
+    fn new((coeffs, degs): (Vec<T>, Vec<usize>)) -> Monomials<T> {
+        // Should do more checks for duplicate elements and need to sort it as well
+        if coeffs.len() != degs.len() {
+            panic!("Attempting to make a Monomials struct with coefficients and \
+                    degrees of different lengths")
+        }
 
-//     type BaseRing = T;
-//     // This is not techincally correct
-//     fn is_poly() -> bool { true }
+        Monomials {
+            lead_scalar: <T>::one(),
+            coeffs,
+            degs
+        }
+    }
+    pub fn with_capacity(n: usize) -> Monomials<T> {
+        Monomials {
+            lead_scalar : <T>::one(),
+            coeffs      : Vec::with_capacity(n),
+            degs        : Vec::with_capacity(n),
+        }
+    }
+}
 
-//     fn zero() -> Self {Coeff::S(<T>::zero())}
-//     fn one() -> Self {Coeff::S(<T>::one())}
+impl<T: ScalarRing> std::iter::FromIterator<(usize, T)> for Monomials<T> {
 
-//     fn add(&self, other: &Self) -> Self {
-//         match (self, other) {
-//            (Coeff::S(s1), Coeff::S(s2)) => Coeff::S(s1.add(&s2)),
-//            (Coeff::S(s1), Coeff::P(p2)) => Coeff::P(Coeff::s_plus_p(*s1, *p2)),
-//            (Coeff::P(p1), Coeff::S(s2)) => Coeff::P(Coeff::s_plus_p(*s2, *p1)),
-//            (Coeff::P(p1), Coeff::P(p2)) => Coeff::P(p1.add(&p2))
-//         }
-//     }
-
-//     fn sub(&self, other: &Self) -> Self {
-//         self.add(&other.neg())
-//     }
-
-//     fn neg(&self) -> Self {
-//         match self {
-//             Coeff::S(s) => Coeff::S(s.neg()),
-//             Coeff::P(p) => Coeff::P(p.neg()),
-//         }
-//     }
-
-//     fn mul(&self, other: &Self) -> Self {
-//         match (self, other) {
-//            (Coeff::S(s1), Coeff::S(s2)) => Coeff::S(s1.mul(&s2)),
-//            (Coeff::S(s1), Coeff::P(p2)) => Coeff::P(p2.scale(*s1)),
-//            (Coeff::P(p1), Coeff::S(s2)) => Coeff::P(p1.scale(*s2)),
-//            (Coeff::P(p1), Coeff::P(p2)) => Coeff::P(p1.mul(&p2))
-//         }
-//     }
-
-// }
-
+    fn from_iter<I: IntoIterator<Item=(usize, T)>>(iter: I) -> Self {
+        // Note: It would be better if we had a 'with_capacity' call here
+        let mut coeffs = Vec::new();
+        let mut degs   = Vec::new();
+        for (deg, coeff) in iter {
+            coeffs.push(coeff);
+            degs.push(deg);
+        }
+        Monomials::new((coeffs, degs))
+    }
+}
 
 impl<T: ScalarRing> PolyU<T> {
 
     pub fn from_coeff(symb: SymbType, coeffs: Vec<T>) -> Result<PolyU<T>, PolyErr> {
         // Converts into a PolyU type. 
-        // It does not accept empty vectors for the terms arguement.
-        // It will automatically compress the terms argument
+        // Automatically compress the terms argument
 
-        if coeffs.is_empty() {
-            Err(PolyErr::EmptyPoly)
-        } else {
-            let terms = coeffs.into_iter().enumerate()
-                              .filter(|(_, c)| *c != <T>::zero())
-                              .map(   |(i, c)| Monomial::new(c, i))
-                              .collect();
+        let terms: Monomials<T> = coeffs.into_iter().enumerate()
+                            .filter(|(_, c)| *c != <T>::zero())
+                            .collect();
 
-            Ok(PolyU::<T> { symb, lead_scalar: <T>::one(), terms })
-        }
+        Ok(PolyU { symb, terms })
     }
 
-    pub fn from_monomials(symb: SymbType, terms: Vec<Monomial<T>>) -> Result<PolyU<T>, PolyErr> {
-        // TODO Probably need to go through and sort the list as well
-        // and remove duplicates
-        Ok (PolyU { symb, lead_scalar: <T>::one(), terms })
+    pub(crate) fn from_terms(symb: SymbType, terms: Monomials<T>) -> Result<PolyU<T>, PolyErr> {
+        // TODO Probably need to go through and sort the list as well and remove duplicates
+        Ok (PolyU { symb, terms })
     }
 
     pub fn deg(&self) -> usize {
-        if self.terms.is_empty() {
-            0
+        // Covers the case of an empty vector as degree 0
+        *self.terms.degs.last().unwrap_or(&0)
+    }
+}
+
+impl<T: ScalarRing> Monomials<T> {
+
+    // Only want these two arrays to be incremented at the same time
+    pub fn push(&mut self, (coeff, deg): (T, usize)) {
+        self.coeffs.push(coeff);
+        self.degs.push(deg);
+    }
+
+    pub fn get(&self, i: usize) -> Option<(T, usize)> {
+        if i < self.coeffs.len() {
+            Some((self.coeffs[i], self.degs[i]))
         } else {
-            self.terms[self.terms.len() - 1].deg
+            None
         }
     }
+
+    pub fn len(&self) -> usize { self.coeffs.len() }
+
+    // A get_unchecked implementation
+    pub fn get_uc(&self, i: usize) -> (T, usize) {
+        unsafe{
+            (*self.coeffs.get_unchecked(i), *self.degs.get_unchecked(i))
+        }
+    }
+}
+
+impl <T: ScalarRing> PolyU<T> {
+
+    pub fn no_terms(&self) -> usize { self.terms.coeffs.len() }
 }
 
 
