@@ -6,7 +6,7 @@ use crate::fft::SupportsFFT;
 use std::f64::consts::PI;
 
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Eq, Debug)]
 pub struct CC(pub Complex64);
 
 // Approximations for now, I don't acutally use this operation though in the FFT
@@ -15,8 +15,6 @@ impl PartialEq for CC {
         (self.0 - other.0).norm() < 0.000000001
     }
 }
-
-impl Eq for CC {}
 
 // <><><><><> Constructors <><><><><> //
 impl CC {

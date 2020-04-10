@@ -1,23 +1,23 @@
 use crate::algebras::*;
 use crate::fft::*;
-use crate::mathutils::*;
 use crate::polyu::*;
+use crate::algebras::polyring::*;
 use crate::algebras::complex::*;
 use crate::algebras::integers::*;
 
-pub trait FastMult: Ring {
-    fn fast_mult(&self, b: &Self, m: usize) -> Self;
+pub trait FastMult: PolyRing {
+    fn fast_mult(&self, b: &Self) -> Self;
 }
 
 // TODO these two should also be a macro
-fn to_coeffs_complex(input: &Monomials<ZZ>, n: usize) -> Vec<CC> {
+fn to_coeffs_complex(input: &Vec<Term<ZZ>>, n: usize) -> Vec<CC> {
     // Expands the input into the expanded coefficient vector (coerced into complex)
     // Then padded with zeros to length n
 
     let mut result: Vec<CC> = Vec::with_capacity(n);
-    for (coeff, deg) in input.iter() {
+    for Term { coeff, deg } in input.iter() {
         // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(deg, CC::zero());
+        result.resize(deg.0 as usize, CC::zero());
         result.push(CC::from_re(coeff.0));
     }
     // Pad the rest
@@ -25,15 +25,15 @@ fn to_coeffs_complex(input: &Monomials<ZZ>, n: usize) -> Vec<CC> {
     result
 }
 
-fn to_coeffs<T: SupportsFFT>(input: &Monomials<T>, n: usize) -> Vec<T> {
+fn to_coeffs<T: SupportsFFT>(input: &Vec<Term<T>>, n: usize) -> Vec<T> {
     // Expands the input into the expanded coefficient vector (coerced into complex)
     // Then padded with zeros to length n
 
     let mut result: Vec<T> = Vec::with_capacity(n);
-    for (coeff, deg) in input.iter() {
+    for Term { coeff, deg } in input.iter() {
         // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(deg, <T>::zero());
-        result.push(coeff);
+        result.resize(deg.0 as usize, <T>::zero());
+        result.push(*coeff);
     }
     // Pad the rest
     result.resize(n, <T>::zero());
@@ -41,16 +41,16 @@ fn to_coeffs<T: SupportsFFT>(input: &Monomials<T>, n: usize) -> Vec<T> {
 }
 
 // TODO these two implementations should be one macro
-impl FastMult for PolyU<CC> {
+impl<'a> FastMult for Poly<'a, CC, Univariate> {
 
-    fn fast_mult(&self, other: &Self, m: usize) -> Self {
+    fn fast_mult(&self, other: &Self) -> Self {
 
-        let n = next_npow(self.deg() + other.deg() + 1, m);
+        let n = (self.deg() + other.deg() + 1).next_power_of_two();
         let mut a_sig = to_coeffs(&self.terms, n);
         let mut b_sig = to_coeffs(&other.terms, n);
 
         // Infix on a_sig
-        eval_interp(&mut a_sig[..], &mut b_sig[..], m).unwrap();
+        eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
 
         // Need to normalise it here
         for x in a_sig.iter_mut() {
@@ -58,19 +58,19 @@ impl FastMult for PolyU<CC> {
         }
 
         // Convert back into polynomial type
-        PolyU::from_coeff(None, a_sig).unwrap()
+        Poly::from_coeff(self.ring, a_sig)
     }
 }
 
-impl FastMult for PolyU<ZZ> {
+impl<'a> FastMult for Poly<'a, ZZ, Univariate> {
 
-    fn fast_mult(&self, other: &Self, m: usize) -> Self {
+    fn fast_mult(&self, other: &Self) -> Self {
 
-        let n = next_npow(self.deg() + other.deg() + 1, m);
+        let n = (self.deg() + other.deg() + 1).next_power_of_two();
         let mut a_sig = to_coeffs_complex(&self.terms, n);
         let mut b_sig = to_coeffs_complex(&other.terms, n);
 
-        eval_interp(&mut a_sig[..], &mut b_sig[..], m).unwrap();
+        eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
 
         // Because we converted it to complex for the ROU
         // We also need to normalise it here
@@ -80,6 +80,6 @@ impl FastMult for PolyU<ZZ> {
                             ).collect();
 
         // Convert back into polynomial type
-        PolyU::from_coeff(None, c_parsed).unwrap()
+        Poly::from_coeff(self.ring, c_parsed)
     }
 }

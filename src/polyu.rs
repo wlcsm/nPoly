@@ -1,146 +1,59 @@
-use crate::error::PolyErr;
 use crate::algebras::*;
+use crate::algebras::polyring::*;
+use std::cmp::Ordering;
 
-type SymbType = Option<String>;
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub(crate) struct Univariate(String);
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct PolyU<T: ScalarRing> {
-    pub(crate) symb  : SymbType, // A literal for the indeterminates
-    pub(crate) terms : Monomials<T>
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub(crate) struct Monomials<T: ScalarRing> {
-    pub(crate) lead_scalar: T,
-    coeffs : Vec<T>,
-    degs   : Vec<usize>,
-}
-
-pub(crate) struct MonomialsIter<'a, T: ScalarRing> {
-    data: &'a Monomials<T>,
-    index: usize,
-}
-
-impl<'a, T: ScalarRing> Iterator for MonomialsIter<'a, T> {
-
-    type Item = (T, usize);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let i = self.index;
-        match (self.data.coeffs.get(i), self.data.degs.get(i)) {
-            (Some(c), Some(d)) => {
-                self.index += 1;
-                Some((*c, *d))
-            },
-            (_, _) => None
-        }
-    }
-}
-impl<'a, T: ScalarRing> Monomials<T> {
-    pub(crate) fn iter(&'a self) -> MonomialsIter<'a, T> {
-        MonomialsIter {
-            data: self,
-            index: 0
-        }
+impl<T: ScalarRing> PRDomain<T, Univariate> {
+    pub fn univar(symb: String) -> PRDomain<T, Univariate> {
+        PRDomain::new(Univariate(symb))
     }
 }
 
-
-impl<T: ScalarRing> Monomials<T> {
-    
-    fn new((coeffs, degs): (Vec<T>, Vec<usize>)) -> Monomials<T> {
-        // Should do more checks for duplicate elements and need to sort it as well
-        if coeffs.len() != degs.len() {
-            panic!("Attempting to make a Monomials struct with coefficients and \
-                    degrees of different lengths")
-        }
-
-        Monomials {
-            lead_scalar: <T>::one(),
-            coeffs,
-            degs
-        }
+impl Variate for Univariate {
+    fn cmp(&self, a: &TermIndex, b: &TermIndex) -> Ordering {
+        a.0.cmp(&b.0)
     }
-    pub fn with_capacity(n: usize) -> Monomials<T> {
-        Monomials {
-            lead_scalar : <T>::one(),
-            coeffs      : Vec::with_capacity(n),
-            degs        : Vec::with_capacity(n),
-        }
+    fn tdeg(&self, index: &TermIndex) -> usize {
+        index.0 as usize
     }
+    fn zero() -> TermIndex { TermIndex(0) }
 }
 
-impl<T: ScalarRing> std::iter::FromIterator<(usize, T)> for Monomials<T> {
+// <><><><><><><><> Constructors <><><><><><><><> //
+impl<'a, T: ScalarRing> Poly<'a, T, Univariate> {
 
-    fn from_iter<I: IntoIterator<Item=(usize, T)>>(iter: I) -> Self {
-        // Note: It would be better if we had a 'with_capacity' call here
-        let mut coeffs = Vec::new();
-        let mut degs   = Vec::new();
-        for (deg, coeff) in iter {
-            coeffs.push(coeff);
-            degs.push(deg);
-        }
-        Monomials::new((coeffs, degs))
-    }
-}
-
-impl<T: ScalarRing> PolyU<T> {
-
-    pub fn from_coeff(symb: SymbType, coeffs: Vec<T>) -> Result<PolyU<T>, PolyErr> {
-        // Converts into a PolyU type. 
+    pub fn from_coeff(ring: &'a PRDomain<T, Univariate>, coeffs: Vec<T>) -> Poly<'a, T, Univariate> {
         // Automatically compress the terms argument
+        let terms = coeffs.into_iter().enumerate()
+                          .filter(|(_, c)| *c != <T>::zero())
+                          .map(|(i, c)| Term::new(c, TermIndex(i as u64)))
+                          .collect();
 
-        let terms: Monomials<T> = coeffs.into_iter().enumerate()
-                            .filter(|(_, c)| *c != <T>::zero())
-                            .collect();
-
-        Ok(PolyU { symb, terms })
-    }
-
-    pub(crate) fn from_terms(symb: SymbType, terms: Monomials<T>) -> Result<PolyU<T>, PolyErr> {
-        // TODO Probably need to go through and sort the list as well and remove duplicates
-        Ok (PolyU { symb, terms })
-    }
-
-    pub fn deg(&self) -> usize {
-        // Covers the case of an empty vector as degree 0
-        *self.terms.degs.last().unwrap_or(&0)
+        Poly::from_terms_unchecked(terms, ring)
     }
 }
 
-impl<T: ScalarRing> Monomials<T> {
+impl<'a, T: ScalarRing> PolyMul for Poly<'a, T, Univariate> {
+    /// Standard O(n^2) multiplication
+    fn mul(&self, other: &Self) -> Self {
 
-    // Only want these two arrays to be incremented at the same time
-    pub fn push(&mut self, (coeff, deg): (T, usize)) {
-        self.coeffs.push(coeff);
-        self.degs.push(deg);
-    }
+        let mut acc = vec![<T>::zero(); self.deg() + other.deg() + 1];
 
-    pub fn get(&self, i: usize) -> Option<(T, usize)> {
-        if i < self.coeffs.len() {
-            Some((self.coeffs[i], self.degs[i]))
-        } else {
-            None
+        for Term {coeff: c_a, deg: d_a } in self.terms.iter() {
+            for Term {coeff: c_b, deg: d_b } in other.terms.iter() {
+                acc[d_a.add(&d_b).0 as usize].add_ass(&c_a.mul(&c_b));
+            }
         }
-    }
 
-    pub fn len(&self) -> usize { self.coeffs.len() }
-
-    // A get_unchecked implementation
-    pub fn get_uc(&self, i: usize) -> (T, usize) {
-        unsafe{
-            (*self.coeffs.get_unchecked(i), *self.degs.get_unchecked(i))
-        }
+        Poly::from_coeff(self.ring, acc)
     }
 }
 
-impl <T: ScalarRing> PolyU<T> {
-
-    pub fn no_terms(&self) -> usize { self.terms.coeffs.len() }
-}
 
 
-// impl fmt::Display for PolyU<ZZ> {
+// impl fmt::Display for Poly<ZZ> {
 
 //     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 //         let sign = |x: ZZ| { if x < 0 {" - "} else {" + "} };
@@ -169,7 +82,7 @@ impl <T: ScalarRing> PolyU<T> {
 
 // }
 
-// impl std::str::FromStr for PolyU<ZZ> {
+// impl std::str::FromStr for Poly<ZZ> {
 //     /// The function to parse a string into a polynomial type
 //     type Err = PolyErr;
 
@@ -185,6 +98,6 @@ impl <T: ScalarRing> PolyU<T> {
 //             acc.push(Monomial::<ZZ>::new(ZZ(x.parse::<i32>()?), i))
 //         };
 
-//         Ok(PolyU::from_monomials(None, acc)?)
+//         Ok(Poly::from_monomials(None, acc)?)
 //     }
 // }

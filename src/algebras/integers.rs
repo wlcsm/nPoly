@@ -2,11 +2,9 @@ use crate::algebras::*;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct ZZ(pub i32);
-extern crate num_complex;
 
 impl Ring for ZZ {
     type BaseRing = ZZ;
-    fn is_poly() -> bool { false }
 
     fn add(&self, other: &Self) -> Self {
         ZZ(self.0 + other.0)

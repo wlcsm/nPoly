@@ -3,3 +3,4 @@
 Cargo.lock
 n_poly.md
 archives/**
+.DS_Store
