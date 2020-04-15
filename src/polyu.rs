@@ -1,45 +1,50 @@
 use crate::algebras::*;
 use crate::algebras::polyring::*;
 use std::cmp::Ordering;
+use generic_array::arr;
+use std::marker::PhantomData;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
-pub(crate) struct Univariate(String);
+pub(crate) struct Univariate<I: IndexTrait> {
+    index_type: PhantomData<I>
+}
 
-impl<T: ScalarRing> PRDomain<T, Univariate> {
-    pub fn univar(symb: String) -> PRDomain<T, Univariate> {
-        PRDomain::new(Univariate(symb))
+
+impl<T: ScalarRing, I: IndexTrait> PRDomain<T, Univariate<I>> {
+    pub fn univar(symb: usize) -> PRDomain<T, Univariate<I>> {
+        PRDomain::new(arr![usize; symb])
     }
 }
 
-impl Variate for Univariate {
-    fn cmp(&self, a: &TermIndex, b: &TermIndex) -> Ordering {
+impl<I: IndexTrait> Variate for Univariate<I> {
+    fn cmp(&self, a: &UniIndex, b: &UniIndex) -> Ordering {
         a.0.cmp(&b.0)
     }
-    fn tdeg(&self, index: &TermIndex) -> usize {
+    fn tdeg(&self, index: &UniIndex) -> usize {
         index.0 as usize
     }
-    fn zero() -> TermIndex { TermIndex(0) }
+    fn zero() -> UniIndex { UniIndex(0) }
 }
 
 // <><><><><><><><> Constructors <><><><><><><><> //
-impl<'a, T: ScalarRing> Poly<'a, T, Univariate> {
+impl<'a, P: PolyRing<Var=Univariate<UniIndex>>> Poly<'a, P> {
 
-    pub fn from_coeff(ring: &'a PRDomain<T, Univariate>, coeffs: Vec<T>) -> Poly<'a, T, Univariate> {
+    pub fn from_coeff(ring: &'a P, coeffs: Vec<P::Coeff>) -> Poly<'a, P> {
         // Automatically compress the terms argument
         let terms = coeffs.into_iter().enumerate()
-                          .filter(|(_, c)| *c != <T>::zero())
-                          .map(|(i, c)| Term::new(c, TermIndex(i as u64)))
+                          .filter(|(_, c)| *c != <P::Coeff>::zero())
+                          .map(|(i, c)| Term::new(c, UniIndex(i)))
                           .collect();
 
         Poly::from_terms_unchecked(terms, ring)
     }
 }
 
-impl<'a, T: ScalarRing> PolyMul for Poly<'a, T, Univariate> {
+impl<'a, P: PolyRing<Var=Univariate<UniIndex>>> Poly<'a, P> {
     /// Standard O(n^2) multiplication
-    fn mul(&self, other: &Self) -> Self {
+    pub fn mul(&self, other: &Self) -> Self {
 
-        let mut acc = vec![<T>::zero(); self.deg() + other.deg() + 1];
+        let mut acc = vec![<P::Coeff>::zero(); self.deg() + other.deg() + 1];
 
         for Term {coeff: c_a, deg: d_a } in self.terms.iter() {
             for Term {coeff: c_b, deg: d_b } in other.terms.iter() {
@@ -51,7 +56,29 @@ impl<'a, T: ScalarRing> PolyMul for Poly<'a, T, Univariate> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+pub struct UniIndex ( pub(crate) usize );
 
+impl Zero for UniIndex {
+    fn zero() -> Self { UniIndex(0) }
+}
+impl IndexTrait for UniIndex {
+    fn deg(&self) -> usize {
+        self.0
+    }
+}
+// impl Group for UniIndex {
+
+//     fn add(&self, other: &Self) -> Self {
+//         UniIndex( self.0 + other.0 )
+//     }
+//     fn sub(&self, other: &Self) -> Self {
+//         UniIndex( self.0 - other.0 )
+//     }
+//     fn neg(&self) -> Self {
+//         panic!("No thank you")
+//     }
+// }
 
 // impl fmt::Display for Poly<ZZ> {
 

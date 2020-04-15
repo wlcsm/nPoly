@@ -6,8 +6,17 @@ use typenum::{U7};
 trait Prime: Unsigned + Copy + Eq {}
 impl Prime for U7 {}
 
-#[derive(Eq, PartialEq, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct FF<U: Prime> (i64, PhantomData<U>);
+
+// I need to reimplment this because I'm allowing the numbers in the FF struct to be
+// stored positively or negatively, so I need to account for these two forms
+impl<U: Prime> PartialEq for FF<U> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0 || <FF<U>>::red(self.0 - other.0) == 0
+    }
+}
+impl<U: Prime> std::cmp::Eq for FF<U> {}
 
 impl<U: Prime> FF<U> {
     // Automatically reduces the number
@@ -39,6 +48,13 @@ impl<U: Prime> fmt::Display for FF<U> {
     }
 }
 
+impl<U: Prime> Zero for FF<U> {
+    fn zero() -> Self { FF::new(0) }
+}
+impl<U: Prime> One for FF<U> {
+    fn one() -> Self { FF::new(1) }
+}
+
 impl<U: Prime> Ring for FF<U> {
     type BaseRing = Self;
 
@@ -51,14 +67,8 @@ impl<U: Prime> Ring for FF<U> {
     fn neg(&self) -> Self {
         FF::new(-self.0)
     }
-    fn zero() -> Self {
-        FF::new(0)
-    }
     fn mul(&self, other: &Self) -> Self {
         FF::new(self.0 * other.0)
-    }
-    fn one() -> Self {
-        FF::new(1)
     }
 }
 
@@ -88,5 +98,11 @@ mod tests {
         let c = FF::<U7>::new(10);
 
         println!("a = {}, b = {}, c = {}", a, b, c);
+        assert_eq!(FF::<U7>::new(3), a.add(&b));
+        assert_eq!(FF::<U7>::new(0), a.sub(&b));
+        assert_eq!(FF::<U7>::new(-2), c.sub(&a));
+
+        // Since one is in a negative representation and the other is positive
+        assert_eq!(a, b);
     }
 }

@@ -1,93 +1,98 @@
 use crate::algebras::*;
+use std::cmp::Ordering;
 use std::marker::PhantomData;
+use generic_array::*;
+use std::fmt::Debug;
 
 // <><><><><><><><><><> Poly Ring Domain <><><><><><><><><><> //
+pub(crate) trait PolyRing: Eq + PartialEq + Clone {
+    type Coeff: ScalarRing;
+    type Var: Variate;
+    fn symb(&self) -> Vec<String>;
+}
+
+// The reason I have kept this generic for now (when at the moment there isn't any immediate
+// need to) is because I plan on implementing quotient rings for which I will need access to generic parameters
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct PRDomain<T: ScalarRing, U: Variate> {
-    pub(crate) vars: U,
+    pub(crate) var: GenericArray<usize, U::NumVar>,
     coeff_type: PhantomData<T>,
+    index_type: PhantomData<U>,
 }
 
+impl<T: ScalarRing, U: Variate> PolyRing for PRDomain<T, U> {
+    type Coeff = T;
+    type Var = U;
+    fn symb(&self) -> GenericArray<usize, U::NumVar> { self.var }
+}
 
 impl<T: ScalarRing, U: Variate> PRDomain<T, U> {
-    pub fn new(vars: U) -> Self { PRDomain { vars, coeff_type: PhantomData } }
+    pub fn new(vars: GenericArray<usize, U::NumVar>) -> Self { 
+        PRDomain { 
+            var: vars,
+            coeff_type: PhantomData,
+            index_type: PhantomData,
+        }
+    }
 }
-
-type SymbType = String;
 
 // <><><><><><><><><><> Polynomial <><><><><><><><><><> //
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Poly<'a, T: ScalarRing, U: Variate> {
-    pub(crate)    ls : T,
-    pub(crate) terms : Vec<Term<T>>,
-    pub(crate)  ring : &'a PRDomain<T, U>,
+pub struct Poly<'a, P: PolyRing> {
+    pub(crate)    ls : P::Coeff,
+    pub(crate) terms : Vec<Term<P>>,
+    pub(crate)  ring : &'a P,
 }
 
-impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
-    // TODO Probably should make a checked version where I sort the list and remove duplicates
-    pub fn from_terms_unchecked(terms: Vec<Term<T>>, ring: &'a PRDomain<T, U>) -> Poly<'a, T, U> {
-        Poly { ls: <T>::one(), terms, ring }
+impl<'a, P: PolyRing> Poly<'a, P> {
+    // TODO Probably should make a checked version where I sort the list 
+    // and remove duplicates
+    pub fn from_terms_unchecked(terms: Vec<Term<P>>, ring: &'a P) -> Poly<'a, P> {
+        Poly { ls: <P::Coeff>::one(), terms, ring }
     }
 }
-
 
 // <><><><><><><><><><> Term <><><><><><><><><><> //
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct Term<T: ScalarRing> {
-    pub coeff : T,
-    pub deg   : TermIndex,
+pub struct Term<P: PolyRing> {
+    pub coeff : P::Coeff,
+    pub deg   : <P::Var as Variate>::Index,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub struct TermIndex ( pub(crate) u64 );
 
-impl Group for TermIndex {
-    fn zero() -> Self { TermIndex(0) }
-
-    fn add(&self, other: &Self) -> Self {
-        TermIndex( self.0 + other.0 )
-    }
-    fn sub(&self, other: &Self) -> Self {
-        TermIndex( self.0 - other.0 )
-    }
-    fn neg(&self) -> Self {
-        panic!("No thank you")
-    }
-}
-
-impl<T: ScalarRing> Term<T> {
+impl<P: PolyRing> Term<P> {
     
-    pub fn new(coeff: T, deg: TermIndex) -> Self {
+    pub fn new(coeff: P::Coeff, deg: <P::Var as Variate>::Index) -> Self {
         Term { coeff, deg }
     }
-    pub fn zero() -> Self { Term::new( <T>::zero(), TermIndex(0) ) }
+    pub fn zero() -> Self { Term::new( <P::Coeff>::zero(), <P::Var as Variate>::Index::zero() ) }
 
-    pub fn scale(&self, scalar: &T) -> Self {
+    pub fn scale(&self, scalar: &P::Coeff) -> Self {
         Term::new( self.coeff.mul(scalar), self.deg )
     } 
 }
 
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
-impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
+impl<'a, P: PolyRing> Poly<'a, P> {
 
     // Only want these two arrays to be incremented at the same time
-    pub fn push(&mut self, (coeff, deg): (T, TermIndex)) {
+    pub fn push(&mut self, (coeff, deg): (P::Coeff, <P::Var as Variate>::Index)) {
         self.terms.push(Term::new(coeff, deg));
     }
 
-    pub fn get(&self, i: usize) -> Option<&Term<T>> {
+    pub fn get(&self, i: usize) -> Option<&Term<P>> {
         self.terms.get(i)
     }
 
     // A get_unchecked implementation
-    pub(crate) fn get_uc(&self, i: usize) -> &Term<T> {
+    pub(crate) fn get_uc(&self, i: usize) -> &Term<P> {
         unsafe{
             self.terms.get_unchecked(i)
         }
     }
 
     // Assumes the lead term is the last element of the vector
-    pub fn lt(&self) -> Term<T> {
+    pub fn lt(&self) -> Term<P> {
         match self.num_terms() {
             0 => Term::zero(),
             n => {
@@ -98,56 +103,63 @@ impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
     }
 
     pub fn num_terms(&self) -> usize     { self.terms.len() }
-    pub fn lc(&self)        -> T         { self.lt().coeff }
-    pub fn lm(&self)        -> TermIndex { self.lt().deg }
-    pub fn deg(&self)       -> usize     { self.ring.vars.tdeg(&self.lm()) }
+    pub fn lc(&self)        -> P::Coeff  { self.lt().coeff }
+    pub fn deg(&self)       -> usize     { <P::Var>::tdeg(&self.lm()) }
+    pub fn lm(&self)        -> <P::Var as Variate>::Index    { self.lt().deg }
 }
 
-
-pub trait Variate: Eq + PartialEq + Clone + std::fmt::Debug {
-    fn cmp(&self, a: &TermIndex, b: &TermIndex) -> Ordering;
-    fn tdeg(&self, index: &TermIndex) -> usize;
-    fn zero() -> TermIndex;
+pub trait IndexTrait: Zero + Clone + Eq + Debug {
+    fn deg(&self) -> usize;
+    fn divides(&self, other: Self) -> bool;
 }
 
-impl<'a, T: ScalarRing, U: Variate> PolyRing for Poly<'a, T, U> {
-    type BaseRing = T;
+pub trait Variate: Clone + Eq + Debug {
+    type NumVar: ArrayLength<usize>;
+    type Index: IndexTrait;
 
-    fn is_zero(&self) -> bool {
-        self.num_terms() == 1 && self.get(0).unwrap().coeff == <T>::zero()
+    fn cmp(a: &Self::Index, b: &Self::Index) -> Ordering;
+    fn tdeg(index: &Self::Index) -> usize;
+    fn zero() -> Self::Index;
+}
+
+// Basic Arithmetic operations for polynomial
+impl<'a, P: PolyRing> Poly<'a, P> {
+
+    pub fn is_zero(&self) -> bool {
+        self.num_terms() == 1 && self.get(0).unwrap().coeff == <P::Coeff>::zero()
     }
 
-    fn add(&self, other: &Self) -> Self {
+    pub fn add(&self, other: &Self) -> Self {
         Poly::elementwise_add(&self, other)
     }
 
     // TODO the negation here is VERY expensive because it is cloning everything 
     // The best solution I can think of is to use smart pointers, and hold things
     // like the lead scalar in the smart pointer
-    fn sub(&self, other: &Self) -> Self {
+    pub fn sub(&self, other: &Self) -> Self {
         Poly::elementwise_add(self, &other.neg())
     }
 
-    fn neg(&self) -> Self {
+    pub fn neg(&self) -> Self {
         let mut res = self.clone();
         res.ls = res.ls.neg();
         res
     }
 
-    fn zero(&self) -> Self {
+    pub fn zero(&self) -> Self {
         Poly::from_terms_unchecked(vec![Term::zero()], self.ring)
     }
 
-    fn is_one(&self) -> bool {
-        self.num_terms() == 1 && self.get(0).unwrap().coeff == <T>::one()
+    pub fn is_one(&self) -> bool {
+        self.num_terms() == 1 && self.get(0).unwrap().coeff == <P::Coeff>::one()
     }
 
-    fn one(&self) -> Self {
+    pub fn one(&self) -> Self {
         Poly::from_terms_unchecked(vec![Term::zero()], self.ring)
     }
 
-    fn scale(&self, scalar: Self::BaseRing) -> Self {
-        if scalar == <Self::BaseRing>::zero() {
+    pub fn scale(&self, scalar: P::Coeff) -> Self {
+        if scalar == <P::Coeff>::zero() {
             Poly::zero(&self)
         } else {
             let mut result = self.clone();
@@ -156,27 +168,22 @@ impl<'a, T: ScalarRing, U: Variate> PolyRing for Poly<'a, T, U> {
         }
     }
 
-    fn scale_ass(&mut self, scalar: Self::BaseRing) {
-        if scalar == <Self::BaseRing>::zero() {
+    pub fn scale_ass(&mut self, scalar: P::Coeff) {
+        if scalar == <P::Coeff>::zero() {
             self.clone_from(&Poly::zero(&self));
         } else {
             self.ls.mul_ass(&scalar);
         }
     }
-}
 
-use std::cmp::Ordering;
-
-impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
-    
-    fn elementwise_add(polya: &Self, polyb: &Self) -> Self {
+    pub fn elementwise_add(polya: &Self, polyb: &Self) -> Self {
 
         if polya.ring != polyb.ring {
             panic!("Try to add two poly with different rings I don't know how to do that yet")
         }
 
         // Knowing which polynomial is bigger is advantages here
-        let (smol, bigg) = match polya.ring.vars.cmp(&polya.lm(), &polyb.lm()) {
+        let (smol, bigg) = match <P::Var>::cmp(&polya.lm(), &polyb.lm()) {
             Ordering::Less => (&polya, &polyb),
             _              => (&polyb, &polya),
         };
@@ -190,13 +197,13 @@ impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
 
         while i < smol.num_terms() {
             let (a, b) = (smol.get_uc(i), bigg.get_uc(j));
-            res.push( match polya.ring.vars.cmp(&a.deg, &b.deg) { // Compare their degrees
+            res.push( match <P::Var>::cmp(&a.deg, &b.deg) { // Compare their degrees
                 Ordering::Less    => { i += 1; a.scale(&smol.ls) },
                 Ordering::Greater => { j += 1; b.scale(&bigg.ls) },
                 Ordering::Equal   => {
                     i += 1; j += 1;
                     let c = a.coeff.mul(&smol.ls).add(&b.coeff.mul(&bigg.ls));
-                    if c == <T>::zero() {
+                    if c == <P::Coeff>::zero() {
                         continue
                     }
                     Term { coeff: c, deg: a.deg }
@@ -212,32 +219,3 @@ impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
         Poly::from_terms_unchecked(res, polya.ring)
     }
 }
-
-// <><><><><><><><> Iterators <><><><><><><><> //
-// pub(crate) struct PolyIter<'a, T: ScalarRing, U: Variate> {
-//     data: &'a Poly<'a, T, U>,
-//     index: usize,
-// }
-
-// impl<'a, T: ScalarRing, U: Variate> Iterator for PolyIter<'a, T, U> {
-
-//     type Item = Term<T>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.data.terms.get(self.index).map(
-//             |mono| {
-//                 self.index += 1;
-//                 *mono
-//             }
-//         )
-//     }
-// }
-
-// impl<'a, T: ScalarRing, U: Variate> Poly<'a, T, U> {
-//     pub(crate) fn iter(&'a self) -> PolyIter<'a, T, U> {
-//         PolyIter {
-//             data: &self,
-//             index: 0
-//         }
-//     }
-// }

@@ -6,7 +6,7 @@ use crate::fft::SupportsFFT;
 use std::f64::consts::PI;
 
 
-#[derive(Clone, Copy, Eq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct CC(pub Complex64);
 
 // Approximations for now, I don't acutally use this operation though in the FFT
@@ -15,6 +15,7 @@ impl PartialEq for CC {
         (self.0 - other.0).norm() < 0.000000001
     }
 }
+impl std::cmp::Eq for CC {}
 
 // <><><><><> Constructors <><><><><> //
 impl CC {
@@ -34,7 +35,6 @@ impl CC {
 // <><><><><> Ring Implementation <><><><><> //
 impl Ring for CC {
     type BaseRing = CC;
-    fn is_poly() -> bool { false }
 
     fn add(&self, other: &Self) -> Self {
         CC(self.0 + other.0)

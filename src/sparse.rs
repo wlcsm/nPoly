@@ -81,7 +81,7 @@ impl<T: SupportsFFT> Subtree<T> {
 
 /// Converts the monomials of the polynomial into instances of Subtree<T>, then sorts them 
 /// with respect to their reverse bit encoding
-pub(crate) fn revbit<T: SupportsFFT>(input: &Poly<T, Univariate>, n: usize) -> Vec<Subtree<T>> {
+pub(crate) fn revbit<T: SupportsFFT>(input: &Poly<Univariate>, n: usize) -> Vec<Subtree<T>> {
 
     // Reverses the bits: TODO assumes that x is less than 2^32
     let revbits = |x: u32| x.reverse_bits() >> (32 - n);
@@ -116,7 +116,7 @@ fn findlowestbranch(mut arg1: Position, arg2: Position) -> usize {
 }
 
 
-pub(crate) fn sparse_eval<T: SupportsFFT>(input: Poly<T, Univariate>, n: usize) -> Vec<T> {
+pub(crate) fn sparse_eval<T: SupportsFFT>(input: Poly<Univariate>, n: usize) -> Vec<T> {
 
     // Obtain RBE
     let rbe = revbit(&input, n);

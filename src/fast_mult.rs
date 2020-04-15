@@ -5,43 +5,43 @@ use crate::algebras::polyring::*;
 use crate::algebras::complex::*;
 use crate::algebras::integers::*;
 
-pub trait FastMult: PolyRing {
+pub trait FastMult {
     fn fast_mult(&self, b: &Self) -> Self;
 }
 
-// TODO these two should also be a macro
-fn to_coeffs_complex(input: &Vec<Term<ZZ>>, n: usize) -> Vec<CC> {
+// // TODO these two should also be a macro
+// fn to_coeffs_complex(input: &Vec<Term<ZZ>>, n: usize) -> Vec<CC> {
+//     // Expands the input into the expanded coefficient vector (coerced into complex)
+//     // Then padded with zeros to length n
+
+//     let mut result: Vec<CC> = Vec::with_capacity(n);
+//     for Term { coeff, deg } in input {
+//         // Fill the gap between monomials with zeros, then add the monomial
+//         result.resize(deg.0 as usize, CC::zero());
+//         result.push(CC::from_re(coeff.0));
+//     }
+//     // Pad the rest
+//     result.resize(n, CC::zero());
+//     result
+// }
+
+fn to_coeffs<P: PolyRing>(input: &Vec<Term<P>>, n: usize) -> Vec<P::Coeff> {
     // Expands the input into the expanded coefficient vector (coerced into complex)
     // Then padded with zeros to length n
 
-    let mut result: Vec<CC> = Vec::with_capacity(n);
+    let mut result: Vec<P::Coeff> = Vec::with_capacity(n);
     for Term { coeff, deg } in input.iter() {
         // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(deg.0 as usize, CC::zero());
-        result.push(CC::from_re(coeff.0));
-    }
-    // Pad the rest
-    result.resize(n, CC::zero());
-    result
-}
-
-fn to_coeffs<T: SupportsFFT>(input: &Vec<Term<T>>, n: usize) -> Vec<T> {
-    // Expands the input into the expanded coefficient vector (coerced into complex)
-    // Then padded with zeros to length n
-
-    let mut result: Vec<T> = Vec::with_capacity(n);
-    for Term { coeff, deg } in input.iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(deg.0 as usize, <T>::zero());
+        result.resize(<P::Var>::tdeg(deg), <P::Coeff>::zero());
         result.push(*coeff);
     }
     // Pad the rest
-    result.resize(n, <T>::zero());
+    result.resize(n, <P::Coeff>::zero());
     result
 }
 
 // TODO these two implementations should be one macro
-impl<'a> FastMult for Poly<'a, CC, Univariate> {
+impl<'a, P: PolyRing<Coeff=CC, Var=Univariate<UniIndex>>> FastMult for Poly<'a, P> {
 
     fn fast_mult(&self, other: &Self) -> Self {
 
@@ -62,24 +62,27 @@ impl<'a> FastMult for Poly<'a, CC, Univariate> {
     }
 }
 
-impl<'a> FastMult for Poly<'a, ZZ, Univariate> {
+// Frozen this at the moment becaue it requires a change of type from CC to ZZ
+// which I don't feel like doing at the moment
 
-    fn fast_mult(&self, other: &Self) -> Self {
+// impl<'a, P: PolyRing<Coeff=CC, Var=Univariate>> FastMult for Poly<'a, P> {
 
-        let n = (self.deg() + other.deg() + 1).next_power_of_two();
-        let mut a_sig = to_coeffs_complex(&self.terms, n);
-        let mut b_sig = to_coeffs_complex(&other.terms, n);
+//     fn fast_mult(&self, other: &Self) -> Self {
 
-        eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
+//         let n = (self.deg() + other.deg() + 1).next_power_of_two();
+//         let mut a_sig = to_coeffs_complex(&self.terms, n);
+//         let mut b_sig = to_coeffs_complex(&other.terms, n);
 
-        // Because we converted it to complex for the ROU
-        // We also need to normalise it here
-        let c_parsed = a_sig.into_iter()
-                            .map(|x| 
-                                ZZ((x.0 / n as f64).re.round() as i32)
-                            ).collect();
+//         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
 
-        // Convert back into polynomial type
-        Poly::from_coeff(self.ring, c_parsed)
-    }
-}
+//         // Because we converted it to complex for the ROU
+//         // We also need to normalise it here
+//         let c_parsed = a_sig.into_iter()
+//                             .map(|x| 
+//                                 ZZ((x.0 / n as f64).re.round() as i32)
+//                             ).collect();
+
+//         // Convert back into polynomial type
+//         Poly::from_coeff(self.ring, c_parsed)
+//     }
+// }
