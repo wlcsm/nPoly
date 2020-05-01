@@ -2,17 +2,18 @@
 extern crate chrono;
 
 use crate::algebras::*;
+use crate::mathutils::log2_unchecked;
 
 
-pub trait SupportsFFT: ScalarRing {
+pub trait SupportsFFT: Field {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
-    fn divby2(self, n: usize) -> Self;
+    fn divby2(&mut self, n: usize);
 }
 
 // Warning: Does it infix by default for speed, infix on a_sig
-pub fn eval_interp<T>(a_sig: &mut [T], b_sig: &mut [T]) -> Result<(), &'static str> 
-    where T: SupportsFFT {
+pub fn eval_interp<F>(a_sig: &mut [F], b_sig: &mut [F]) -> Result<(), &'static str> 
+    where F: SupportsFFT {
 
     let n = a_sig.len();
 
@@ -36,27 +37,27 @@ pub fn eval_interp<T>(a_sig: &mut [T], b_sig: &mut [T]) -> Result<(), &'static s
 }
 
 
-pub fn dft<T: SupportsFFT>(signal: &mut [T], inv: bool) {
+pub fn dft<F: SupportsFFT>(signal: &mut [F], inv: bool) {
 
     let n = signal.len();
     let result = signal.to_vec();
 
     // Generate the nth roots of unity
-    let rou = <T>::rou(n, inv);
+    let rou = <F>::rou(n, inv);
 
     // Evaluates: p * q mod n.
     let modx = |p, q| (((p * q) % n) + n) % n;
 
     // F(k) = \sum^n_{j=0} x_j e^{-2\pi i jk / n}
     for k in 0..n {
-        let term: T = result.iter().enumerate()
+        let term = result.iter().enumerate()
                                     .map(|(i, c)| rou[modx(k, i)].mul(c))
-                                    .fold(<T>::zero(), |a, b| a.add(&b));
+                                    .fold(<F>::zero(), |a, b| a.add(&b));
         signal[k] = term;
     }
 }
 
-pub fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool) -> Result<(), &'static str> {
+pub fn perform_fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'static str> {
     // Sample is the signal. Performs the FFT inline
     // Does not normalise the inverse!
 
@@ -75,11 +76,11 @@ pub fn perform_fft<T: SupportsFFT>(signal: &mut [T], inv: bool) -> Result<(), &'
     }
 }
 
-pub fn go_fast<T: SupportsFFT>(signal: &mut [T], inv: bool) {
+pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     // Assumes that the length of 'signal' is >= 4
 
     let n   = signal.len();
-    let rou = <T>::rou(n, inv); // Generates roots of unity
+    let rou = <F>::rou(n, inv); // Generates roots of unity
 
     // Does first iteration and puts into reverse bit order.
     for (i, j) in (0..n / 2).zip(n / 2..n).step_by(2) {
@@ -110,20 +111,16 @@ pub fn go_fast<T: SupportsFFT>(signal: &mut [T], inv: bool) {
     }
 }
 
-// Note: Unchecked, assumes that n is a power of two
-fn log2_unchecked(n: usize) -> usize {
-    (n.trailing_zeros() + 1) as usize
-}
 
 #[cfg(test)]
 mod tests {
     extern crate chrono;
     extern crate rand;
 
-    use super::*;
     use chrono::*;
     use crate::fast_mult::*;
-    use crate::algebras::integers::ZZ;
+    use crate::algebras::complex::CC;
+    // use crate::algebras::integers::ZZ;
     use crate::algebras::polyring::*;
     use crate::polyu::*;
 
@@ -131,14 +128,14 @@ mod tests {
 
     #[test]
     fn bench_dense_main() {
-        let ring = PRDomain::univar("x".to_string());
+        let ring = PRDomain::univar(1);
 
         // Note all coefficients are nonzero
         let dist = Uniform::from(1..100);
         let mut rng = rand::thread_rng();
         // A function to randomly generate a polynomial with n coefficients
-        let mut make_poly = |n: usize| -> Poly<ZZ, Univariate> {
-            let res_vec = (0..n).map(|_| ZZ(dist.sample(&mut rng))).collect();
+        let mut make_poly = |n: usize| -> PolyU<CC> {
+            let res_vec = (0..n).map(|_| CC::from_re(dist.sample(&mut rng))).collect();
             Poly::from_coeff(&ring, res_vec)
         };
 
@@ -165,13 +162,13 @@ mod tests {
 
     #[test]
     fn mult_test_main() {
-        let ring = PRDomain::univar(1);
-
-        let a = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(1)]);
-        let b = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(3)]);
-        let c = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(2), ZZ(1)]);
-
         // Postponing until I get the fast multiplication for ZZ working
+
+        // let ring = PRDomain::univar(1);
+        // let a = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(1)]);
+        // let b = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(3)]);
+        // let c = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(2), ZZ(1)]);
+
 
         // assert_eq!(a.mul(&b), a.fast_mult(&b));
         // assert_eq!(b.mul(&c), b.fast_mult(&c));

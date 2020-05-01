@@ -1,6 +1,7 @@
 /// The polynomial crate
 
 extern crate generic_array;
+#[macro_use] extern crate itertools;
 
 pub mod error;
 pub mod polyu;
@@ -16,9 +17,7 @@ pub mod sparse;
 mod tests {
 
     use crate::algebras::integers::ZZ;
-    use crate::algebras::*;
     use crate::algebras::polyring::*;
-    use super::polyu::*;
 
     #[test]
     fn basics() {

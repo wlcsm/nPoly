@@ -31,10 +31,16 @@ impl CC {
     }
 }
 
+impl Zero for CC {
+    fn zero() -> Self { CC(Complex64::new(0.0, 0.0)) }
+}
+
+impl One for CC {
+    fn one() -> Self { CC(Complex64::new(1.0, 0.0)) }
+}
 
 // <><><><><> Ring Implementation <><><><><> //
 impl Ring for CC {
-    type BaseRing = CC;
 
     fn add(&self, other: &Self) -> Self {
         CC(self.0 + other.0)
@@ -45,14 +51,8 @@ impl Ring for CC {
     fn neg(&self) -> Self {
         CC(-self.0)
     }
-    fn zero() -> Self {
-        CC(Complex64::new(0.0, 0.0))
-    }
     fn mul(&self, other: &Self) -> Self {
         CC(self.0 * other.0)
-    }
-    fn one() -> Self {
-        CC(Complex64::new(1.0, 0.0))
     }
 }
 
@@ -67,6 +67,28 @@ impl ScalarRing for CC {
     }
     fn mul_ass(&mut self, other: &Self) {
         self.0 *= other.0
+    }
+}
+
+impl EuclideanDomain for CC {
+
+    fn divides(&self, other: &Self) -> Option<bool> {
+        other.0.checked_rem_euclid(self.0).and_then(|r| Some(r == 0))
+    }
+    fn gcd(&self, other: &Self) -> Self {
+        if self.0 == 0 { *other } else {CC(other.0 % self.0).gcd(&self) }
+    }
+    fn lcm(&self, other: &Self) -> Self {
+        CC((self.0 * other.0) / self.gcd(&other).0)
+    }
+}
+
+impl Field for CC {
+    fn div(&self, other: &Self) -> Option<CC> {
+        match other {
+            CC::zero() => None,
+            n          => Some(CC(self.0 / other.0)),
+        }
     }
 }
 

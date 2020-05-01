@@ -15,6 +15,11 @@ pub fn next_npow(num: usize, n: usize) -> usize {
     if is_n_pow(num, n) { num } else { n.pow((logn(num, n) + 1) as u32) }
 }
 
+// Note: Unchecked, assumes that n is a power of two
+pub fn log2_unchecked(n: usize) -> usize {
+    (n.trailing_zeros() + 1) as usize
+}
+
 // Exponentiation function: n^exp
 // pub fn pow(n: usize, exp: usize) -> usize {
 //     match exp {

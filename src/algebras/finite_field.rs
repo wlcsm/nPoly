@@ -7,56 +7,56 @@ trait Prime: Unsigned + Copy + Eq {}
 impl Prime for U7 {}
 
 #[derive(Clone, Copy)]
-struct FF<U: Prime> (i64, PhantomData<U>);
+struct FF<P: Prime> (i64, PhantomData<P>);
 
 // I need to reimplment this because I'm allowing the numbers in the FF struct to be
 // stored positively or negatively, so I need to account for these two forms
-impl<U: Prime> PartialEq for FF<U> {
+impl<P: Prime> PartialEq for FF<P> {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0 || <FF<U>>::red(self.0 - other.0) == 0
+        self.0 == other.0 || <FF<P>>::red(self.0 - other.0) == 0
     }
 }
-impl<U: Prime> std::cmp::Eq for FF<U> {}
 
-impl<U: Prime> FF<U> {
+impl<P: Prime> std::cmp::Eq for FF<P> {}
+
+impl<P: Prime> FF<P> {
     // Automatically reduces the number
-    fn new(q: i64) -> Self {
-        FF(q % U::to_i64() , PhantomData)
+    pub fn new(q: i64) -> Self {
+        FF(q % P::to_i64() , PhantomData)
     }
 
-    #[warn(dead_code)]
-    fn new_unchecked(q: i64) -> Self {
+    pub fn new_unchecked(q: i64) -> Self {
         FF(q, PhantomData)
     }
 
-    fn red(q: i64) -> i64 {
-        q % U::to_i64()
+    pub fn red(q: i64) -> i64 {
+        q % P::to_i64()
     }
 }
 
 use std::fmt;
 
-impl<U: Prime> fmt::Debug for FF<U> {
+impl<P: Prime> fmt::Debug for FF<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "F({})", self.0)
     }
 }
 
-impl<U: Prime> fmt::Display for FF<U> {
+impl<P: Prime> fmt::Display for FF<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl<U: Prime> Zero for FF<U> {
+impl<P: Prime> Zero for FF<P> {
     fn zero() -> Self { FF::new(0) }
 }
-impl<U: Prime> One for FF<U> {
+impl<P: Prime> One for FF<P> {
     fn one() -> Self { FF::new(1) }
 }
 
-impl<U: Prime> Ring for FF<U> {
-    type BaseRing = Self;
+impl<P: Prime> Ring for FF<P> {
+    type BaseRing = FF<P>;
 
     fn add(&self, other: &Self) -> Self {
         FF::new(self.0 + other.0)
@@ -72,18 +72,17 @@ impl<U: Prime> Ring for FF<U> {
     }
 }
 
-impl<U: Prime> ScalarRing for FF<U> {
+impl<P: Prime> ScalarRing for FF<P> {
     fn add_ass(&mut self, other: &Self) {
-        self.0 = <FF<U>>::red(self.0 + other.0)
+        self.0 = <FF<P>>::red(self.0 + other.0)
     }
     fn sub_ass(&mut self, other: &Self) {
-        self.0 = <FF<U>>::red(self.0 - other.0)
+        self.0 = <FF<P>>::red(self.0 - other.0)
     }
     fn mul_ass(&mut self, other: &Self) {
-        self.0 = <FF<U>>::red(self.0 * other.0)
+        self.0 = <FF<P>>::red(self.0 * other.0)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

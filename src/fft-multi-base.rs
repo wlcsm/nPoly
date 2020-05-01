@@ -27,10 +27,10 @@ pub fn go_fast_base_n<T: SupportsFFT>(sig: &mut [T], inv: bool, m: usize) {
     // Assumes that the length of 'signal' is >= 4
 
     let n   = sig.len();
-    let rou = <T>::rou(n, inv); // Generates roots of unity
+    let rou = <F>::rou(n, inv); // Generates roots of unity
 
     // Does first iteration and puts into reverse bit order.
-    let mut result = vec![<T>::zero(); n];
+    let mut result = vec![<F>::zero(); n];
 
     for i in (0..n/m).step_by(m) {
         for l in 0..m {
@@ -49,7 +49,7 @@ pub fn go_fast_base_n<T: SupportsFFT>(sig: &mut [T], inv: bool, m: usize) {
         // Iterate over all the flutters, j is their starting index
         for j in (0..n).step_by(flut) {
             // Width of the k-flutter (number of elements)
-            let mut tmp = vec![<T>::zero(); m];
+            let mut tmp = vec![<F>::zero(); m];
             for ind in 0..flut/m {
 
                 for p in 0..m {

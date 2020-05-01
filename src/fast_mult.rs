@@ -2,8 +2,7 @@ use crate::algebras::*;
 use crate::fft::*;
 use crate::polyu::*;
 use crate::algebras::polyring::*;
-use crate::algebras::complex::*;
-use crate::algebras::integers::*;
+use crate::mathutils::log2_unchecked;
 
 pub trait FastMult {
     fn fast_mult(&self, b: &Self) -> Self;
@@ -32,7 +31,7 @@ fn to_coeffs<P: PolyRing>(input: &Vec<Term<P>>, n: usize) -> Vec<P::Coeff> {
     let mut result: Vec<P::Coeff> = Vec::with_capacity(n);
     for Term { coeff, deg } in input.iter() {
         // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(<P::Var>::tdeg(deg), <P::Coeff>::zero());
+        result.resize(deg.tot_deg(), <P::Coeff>::zero());
         result.push(*coeff);
     }
     // Pad the rest
@@ -41,7 +40,7 @@ fn to_coeffs<P: PolyRing>(input: &Vec<Term<P>>, n: usize) -> Vec<P::Coeff> {
 }
 
 // TODO these two implementations should be one macro
-impl<'a, P: PolyRing<Coeff=CC, Var=Univariate<UniIndex>>> FastMult for Poly<'a, P> {
+impl<'a, T: SupportsFFT> FastMult for PolyU<'a, T> {
 
     fn fast_mult(&self, other: &Self) -> Self {
 
@@ -54,7 +53,7 @@ impl<'a, P: PolyRing<Coeff=CC, Var=Univariate<UniIndex>>> FastMult for Poly<'a, 
 
         // Need to normalise it here
         for x in a_sig.iter_mut() {
-            x.0 /= n as f64
+            x.divby2(log2_unchecked(n))
         }
 
         // Convert back into polynomial type

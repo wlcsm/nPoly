@@ -30,6 +30,18 @@ pub trait ScalarRing: Ring + Copy + std::fmt::Debug {
     fn mul_ass(&mut self, other: &Self);
 }
 
+pub trait EuclideanDomain: Ring {
+    fn gcd(&self, other: &Self) -> Self;
+    fn lcm(&self, other: &Self) -> Self;
+    fn divides(&self, other: &Self) -> Option<bool>; // Option in case other == 0
+}
+
+// TODO: Make a macro which implements EuclideanDomain for fields
+
+pub trait Field: ScalarRing + EuclideanDomain {
+    fn div(&self, other: &Self) -> Option<Self>;
+}
+
 pub trait Zero {
     fn zero() -> Self;
 }
@@ -37,27 +49,3 @@ pub trait Zero {
 pub trait One {
     fn one() -> Self;
 }
-// I have separated PolyMul from the PolyRing trait because the PolyRing trait
-// can be implemented generically over univariate and multivariate polynomials.
-// But the mul function cannot be (easily at least). This is because I need to implement
-// Kronecker substitution or something. I might also just replace this trait with the 
-// FastMul trait
-
-// Ideally The PolyRing type should be the combination of these two, not PolyMul being the combination
-// pub trait PolyMul: PolyRing {
-//     fn mul(&self, other: &Self) -> Self;
-// }
-
-// pub trait PolyRing {
-//     type BaseRing: ScalarRing + std::fmt::Debug;
-//     fn zero(&self) -> Self;
-//     fn is_zero(&self) -> bool;
-//     fn add(&self, other: &Self) -> Self;
-//     fn sub(&self, other: &Self) -> Self;
-//     fn neg(&self) -> Self;
-//     // Ring operations
-//     fn is_one(&self) -> bool;
-//     fn one(&self) -> Self;
-//     fn scale(&self, scalar: Self::BaseRing) -> Self;
-//     fn scale_ass(&mut self, scalar: Self::BaseRing);
-// }

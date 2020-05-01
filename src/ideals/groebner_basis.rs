@@ -1,48 +1,77 @@
 use crate::algebras::*;
 use crate::algebras::polyring::*;
-use crate::polyu::*;
-use crate::polym::*;
 
+#[derive(Clone)]
 pub struct Ideal<'a, P: PolyRing> {
     gens: Vec<Poly<'a, P>>,
 }
 
-pub fn BB_algorithm<P: PolyRing>(basis: Ideal<P>) -> Ideal<P> {
-    unimplemented!()
-}
-
-fn quo_rem<P: PolyRing>(ring: &P, a: Term<P>, b: Term<P>) -> (Term<P>, Term<P>) {
-    if a.divides(b) {
-        
+impl<'a, P: PolyRing> Ideal<'a, P> {
+    fn push(&mut self, item: Poly<'a, P>) {
+        self.gens.push(item)
     }
 }
 
-pub fn divpoly<'a, P>(f: Poly<'a, P>, F: Vec<Poly<'a, P>>) -> (Vec<Poly<'a, P>>, Poly<'a, P>) 
-    where P: PolyRing {
+pub fn bb_algorithm<F: Field, P: PolyRing<Coeff=F>>(g: Ideal<P>) -> Ideal<P> {
+    // "New" are the newly added polynomials that we need to check
+    // "Acc" is the accumulator for the new Groebner basis
+    // "Next" are the next values that we need to transfer into the "New" vector
+    let mut new = g.gens.clone(); 
+    let mut acc = g.clone();
 
-    let f_vec = f.terms.clone();
-    let r = vec![]; // This is a zero polynomial in the same ring as f
-    let q: Vec<Vec<Term<P>>> = vec![Vec::new(); F.len()];
-
-    while !f.is_zero() {
-        let i = 0;
-        let divisionoccured = false;
-        while i < F.len() && !divisionoccured {
-
-            let (quo, rem) = quo_rem(f.ring, f.lt(), F[i].lt());
-            if rem.coeff == <P::Coeff>::zero() {
-                q[i].push(quo);
-                f_vec.pop();
-                divisionoccured = true;
-            } else {
-                i += 1;
+    while !new.is_empty() {
+        let mut next = Vec::new();
+        while let Some(f) = new.pop() {
+            for g in &acc.gens {
+                let r = f.s_poly(&g).reduce(&acc);
+                if r.is_zero() {
+                    next.push(r)
+                }
             }
+            acc.push(f);
         }
-        if !divisionoccured {
-            r.push(f_vec.pop().unwrap()); // Transfer the lead term from f to r
-        }
+        new = next;
     }
-    let q_poly = q.into_iter().map(|v| Poly::from_terms_unchecked(v, f.ring)).collect();
-    let r_poly = Poly::from_terms_unchecked(r, f.ring);
-    (q_poly, r_poly)
+    g
+}
+
+impl<'a, F: Field, P: PolyRing<Coeff=F>> Poly<'a, P> {
+    fn pop(&mut self) -> Option<Term<P>> {
+        self.terms.pop()
+    }
+    fn push(&mut self, item: Term<P>) {
+        self.terms.push(item)
+    }
+    fn s_poly(&self, other: &Self) -> Self {
+        let gcd = self.lt().gcd(&other.lt());
+        let a_newlead = gcd.div(self.lt()).unwrap();
+        let b_newlead = gcd.div(other.lt()).unwrap();
+        self.term_scale(&a_newlead).sub(&other.term_scale(&b_newlead))
+    }
+}
+
+impl<'a, F: Field, P: PolyRing<Coeff=F>> Poly<'a, P> {
+
+    fn reduce(&self, g: &Ideal<'a, P>) -> Self {
+        self.divpolys(&g.gens).1
+    }
+
+    pub fn divpolys(&self, f: &Vec<Self>) -> (Vec<Self>, Self) {
+
+        let mut p = self.clone();
+        let mut r = self.zero();  // This is a zero polynomial in the same ring as f
+        let mut q = vec![self.zero(); f.len()];
+
+        'outer: while !p.is_zero() {
+            for i in 0 .. f.len() {
+                if let Some(quo) = p.lt().div(f[i].lt()) {
+                    p = p.sub(&p.term_scale(&quo));
+                    q[i].push(quo);
+                    continue 'outer;
+                }
+            }
+            r.push(p.pop().unwrap()); // Executes if no division occured
+        }
+        (q, r)
+    }
 }

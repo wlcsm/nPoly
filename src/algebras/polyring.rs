@@ -5,33 +5,38 @@ use generic_array::*;
 use std::fmt::Debug;
 
 // <><><><><><><><><><> Poly Ring Domain <><><><><><><><><><> //
-pub(crate) trait PolyRing: Eq + PartialEq + Clone {
+pub trait PolyRing: Eq + PartialEq + Clone {
     type Coeff: ScalarRing;
     type Var: Variate;
-    fn symb(&self) -> Vec<String>;
+    type Ord: MonomialOrdering<Self::Var>;
+    fn symb(&self) -> Vec<usize>;
 }
+pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug {}
 
 // The reason I have kept this generic for now (when at the moment there isn't any immediate
 // need to) is because I plan on implementing quotient rings for which I will need access to generic parameters
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct PRDomain<T: ScalarRing, U: Variate> {
+pub struct PRDomain<R: ScalarRing, U: Variate, M: MonomialOrdering<U>> {
     pub(crate) var: GenericArray<usize, U::NumVar>,
-    coeff_type: PhantomData<T>,
-    index_type: PhantomData<U>,
+    ring_parameters: PhantomData<(R, U, M)>,
 }
 
-impl<T: ScalarRing, U: Variate> PolyRing for PRDomain<T, U> {
-    type Coeff = T;
+impl<R, U, M> PolyRing for PRDomain<R, U, M>
+    where R: ScalarRing, U: Variate, M: MonomialOrdering<U> {
+    type Coeff = R;
     type Var = U;
-    fn symb(&self) -> GenericArray<usize, U::NumVar> { self.var }
+    type Ord = M;
+    fn symb(&self) -> Vec<usize> {
+        self.var.clone().into_iter().collect()
+    }
 }
 
-impl<T: ScalarRing, U: Variate> PRDomain<T, U> {
+impl<R, U, M> PRDomain<R, U, M>
+    where R: ScalarRing, U: Variate, M: MonomialOrdering<U> {
     pub fn new(vars: GenericArray<usize, U::NumVar>) -> Self { 
         PRDomain { 
             var: vars,
-            coeff_type: PhantomData,
-            index_type: PhantomData,
+            ring_parameters: PhantomData,
         }
     }
 }
@@ -56,29 +61,80 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Term<P: PolyRing> {
     pub coeff : P::Coeff,
-    pub deg   : <P::Var as Variate>::Index,
+    pub deg   : P::Var,
 }
 
-
 impl<P: PolyRing> Term<P> {
-    
-    pub fn new(coeff: P::Coeff, deg: <P::Var as Variate>::Index) -> Self {
+    pub fn new(coeff: P::Coeff, deg: P::Var) -> Self {
         Term { coeff, deg }
     }
-    pub fn zero() -> Self { Term::new( <P::Coeff>::zero(), <P::Var as Variate>::Index::zero() ) }
 
     pub fn scale(&self, scalar: &P::Coeff) -> Self {
-        Term::new( self.coeff.mul(scalar), self.deg )
+        Term::new( self.coeff.mul(scalar), self.deg.clone() )
     } 
+    pub fn cmpdeg(&self, other: Self) -> Ordering {
+        <P::Ord>::cmp(&self.deg, &other.deg)
+    }
+}
+impl<P: PolyRing> Zero for Term<P> {
+    fn zero() -> Self { Term::new(<P::Coeff>::zero(), <P::Var>::zero())}
+}
+impl<P: PolyRing> One for Term<P> {
+    fn one() -> Self { Term::new(<P::Coeff>::one(), <P::Var>::zero())}
+}
+
+impl<P: PolyRing> Ring for Term<P> {
+
+    type BaseRing = P::Coeff; 
+    // Group operations
+    fn add(&self, other: &Self) -> Self {
+        unimplemented!()
+    }
+    fn sub(&self, other: &Self) -> Self {
+        unimplemented!()
+    }
+    fn neg(&self) -> Self {
+        Term::new(self.coeff.neg(), self.deg.clone())
+    }
+    // Ring operations
+    fn mul(&self, other: &Self) -> Self {
+        Term::new(self.coeff.mul(&other.coeff), self.deg.add(&other.deg))
+    }
+}
+
+impl<E, P> EuclideanDomain for Term<P> 
+    where E: ScalarRing + EuclideanDomain, P: PolyRing<Coeff=E> {
+
+    fn gcd(&self, other: &Self) -> Self {
+        Term::new(self.coeff.gcd(&other.coeff), self.deg.gcd(&other.deg))
+    }
+    fn lcm(&self, other: &Self) -> Self {
+        Term::new(self.coeff.lcm(&other.coeff), self.deg.lcm(&other.deg))
+    }
+
+    fn divides(&self, other: &Self) -> Option<bool> {
+        match (self.coeff.divides(&other.coeff), self.deg.divides(&other.deg)) {
+            (Some(a), Some(b)) => Some(a && b),
+            _                  => None,
+        }
+    }
+}
+
+impl<F: Field, P: PolyRing<Coeff=F>> Term<P> {
+    pub fn div(&self, other: Self) -> Option<Self> {
+        if self.divides(&other) == Some(true) {
+            Some(Term::new(
+                self.coeff.div(&other.coeff).unwrap(),
+                self.deg.sub(&other.deg).unwrap()
+            ))
+        } else {
+            None
+        }
+    }
 }
 
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
 impl<'a, P: PolyRing> Poly<'a, P> {
-
-    // Only want these two arrays to be incremented at the same time
-    pub fn push(&mut self, (coeff, deg): (P::Coeff, <P::Var as Variate>::Index)) {
-        self.terms.push(Term::new(coeff, deg));
-    }
 
     pub fn get(&self, i: usize) -> Option<&Term<P>> {
         self.terms.get(i)
@@ -104,27 +160,40 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 
     pub fn num_terms(&self) -> usize     { self.terms.len() }
     pub fn lc(&self)        -> P::Coeff  { self.lt().coeff }
-    pub fn deg(&self)       -> usize     { <P::Var>::tdeg(&self.lm()) }
-    pub fn lm(&self)        -> <P::Var as Variate>::Index    { self.lt().deg }
+    pub fn deg(&self)       -> usize     { <P::Var>::tot_deg(&self.lm()) }
+    pub fn lm(&self)        -> P::Var    { self.lt().deg }
 }
 
-pub trait IndexTrait: Zero + Clone + Eq + Debug {
-    fn deg(&self) -> usize;
-    fn divides(&self, other: Self) -> bool;
+pub trait MonomialOrdering<I: Variate>: Clone + Eq {
+    fn cmp(a: &I, b: &I) -> Ordering;
 }
 
-pub trait Variate: Clone + Eq + Debug {
-    type NumVar: ArrayLength<usize>;
-    type Index: IndexTrait;
+pub trait Variate: Zero + Clone + Eq + Debug {
+    type NumVar: VarNumber;
 
-    fn cmp(a: &Self::Index, b: &Self::Index) -> Ordering;
-    fn tdeg(index: &Self::Index) -> usize;
-    fn zero() -> Self::Index;
+    fn tot_deg(&self) -> usize;
+    fn add(&self, other: &Self) -> Self;
+    fn sub(&self, other: &Self) -> Option<Self>;
+
+    // This is implementing the EuclideanDomain trait, but this doesn't actually form a
+    // ring so it isn't technically one
+    fn gcd(&self, other: &Self) -> Self;
+    fn lcm(&self, other: &Self) -> Self;
+    fn divides(&self, other: &Self) -> Option<bool>;
 }
 
 // Basic Arithmetic operations for polynomial
 impl<'a, P: PolyRing> Poly<'a, P> {
 
+    pub fn term_scale(&self, term: &Term<P>) -> Poly<'a, P> {
+        let new_terms = self.terms.iter().map(|Term { coeff, deg }| 
+            Term::new(
+                coeff.mul(&term.coeff),
+                deg.add(&term.deg)
+            )).collect();
+        Poly::from_terms_unchecked(new_terms, self.ring)
+        
+    }
     pub fn is_zero(&self) -> bool {
         self.num_terms() == 1 && self.get(0).unwrap().coeff == <P::Coeff>::zero()
     }
@@ -183,7 +252,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         }
 
         // Knowing which polynomial is bigger is advantages here
-        let (smol, bigg) = match <P::Var>::cmp(&polya.lm(), &polyb.lm()) {
+        let (smol, bigg) = match <P::Ord>::cmp(&polya.lm(), &polyb.lm()) {
             Ordering::Less => (&polya, &polyb),
             _              => (&polyb, &polya),
         };
@@ -197,7 +266,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 
         while i < smol.num_terms() {
             let (a, b) = (smol.get_uc(i), bigg.get_uc(j));
-            res.push( match <P::Var>::cmp(&a.deg, &b.deg) { // Compare their degrees
+            res.push( match <P::Ord>::cmp(&a.deg, &b.deg) { // Compare their degrees
                 Ordering::Less    => { i += 1; a.scale(&smol.ls) },
                 Ordering::Greater => { j += 1; b.scale(&bigg.ls) },
                 Ordering::Equal   => {
@@ -206,7 +275,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
                     if c == <P::Coeff>::zero() {
                         continue
                     }
-                    Term { coeff: c, deg: a.deg }
+                    Term { coeff: c, deg: a.deg.clone() }
                 },
             })
         }
