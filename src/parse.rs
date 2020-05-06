@@ -5,12 +5,8 @@
 extern crate regex;
 
 use crate::algebras::polyring::*;
-use crate::algebras::integers::ZZ;
 use crate::algebras::*;
 use crate::error::PolyErr;
-use crate::polym::*;
-use crate::polyu::*;
-use generic_array::GenericArray;
 
 use regex::Regex;
 
@@ -31,12 +27,12 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
         let mut mono_named = format!("(?P<coeff>{})", P::Coeff::REGEX);
 
         for s in ring.symb() {
-            mono.push_str(&format!(r"{var}\^\d*", var = s));
-            mono_named.push_str(&format!(r"{var}\^(?P<{var}>\d*)", var = s));
+            mono.push_str(&format!(r"({var}\^\d*)?", var = s));
+            mono_named.push_str(&format!(r"(?:{var}\^(?P<{var}>\d*))?", var = s));
         }
 
         // Validates the entire thing
-        let whole_regex = Regex::new(&format!( r"{m}(\s*(\+|-)\s*{m})*", m = mono)).unwrap();
+        let whole_regex = Regex::new(&format!( r"^{m}(\s*(\+|-)\s*{m})*$", m = mono)).unwrap();
         // Parse each term. The "?" is in there for the first term which might not have a + or -,
         // all the other terms are guarenteed to have one because it is checked in the whole_regex
         let term_regex = Regex::new(&format!(r"(?P<sign>\+|-)?\s*{}", mono_named)).unwrap();
@@ -46,17 +42,15 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
         } else {
             let mut acc = Vec::new();
             for caps in term_regex.captures_iter(s) {
-                let mut coeff = if caps["coeff"].is_empty() {
-                    P::Coeff::one()
-                } else {
-                    caps["coeff"]
-                    .parse::<P::Coeff>()
-                    .map_err(|_| PolyErr::ParsePolyError)?
-                };
+                // Extract the coefficient, at the moment, it needs a 1 there
+                let mut coeff = caps["coeff"].parse::<P::Coeff>().map_err(|_| PolyErr::ParsePolyError)?;
+
+                // Take into account if it is a subtraction
                 if let Some("-") = caps.name("sign").map(|c| c.as_str()) {
                     coeff = coeff.neg();
                 }
 
+                // Extract the indices of the interminates in the term
                 let mut degrees = P::Var::zero();
                 for (i, symb) in ring.symb().iter().enumerate() {
                     if let Some(n) = caps.name(symb.to_string().as_str()) {
@@ -80,15 +74,26 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 mod tests {
     use super::*;
     use crate::algebras::integers::ZZ;
-
+    use generic_array::typenum::U2;
+    use crate::polym::*;
+    use crate::polyu::*;
+    
     #[test]
     fn parsing_test() {
-        // Current Problem: I need to use "x" variable otherwise the parser won't work. But i've
-        // made it so that only numbers can be used as variables, so need to write a function to
-        // convert it all into numbers
+        // Univariate
         let ring = PRDomain::<ZZ, UniIndex, UnivarOrder>::new(vec!['x']);
-        let a = Poly::from_str(&ring, "3x^2 + 5x^98 + 0x^2 + x^2 - x^2").unwrap();
+        let a = Poly::from_str(&ring, "3x^2 + 5x^98 + 0x^2 + 1x^2 - 1x^2").unwrap();
         println!("{:?}", a);
         println!("{}", a);
+
+
+        // Multivariate
+        let ring = PRDomain::<ZZ, MultiIndex<U2>, Lex>::new(vec!['x', 'y']);
+        let a = Poly::from_str(&ring, "3x^2y^6 + 5x^98y^2").unwrap();
+        let b = Poly::from_str(&ring, "5x^6").unwrap();
+        println!("a = {:?}", a);
+        println!("b = {:?}", b);
+        println!("a = {}", a);
+        println!("b = {}", b);
     }
 }

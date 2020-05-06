@@ -80,14 +80,14 @@ impl ScalarRing for RR {
 }
 
 impl EuclideanDomain for RR {
-    fn divides(&self, other: &Self) -> Option<bool> {
+    fn divides(&self, _other: &Self) -> Option<bool> {
         if *self != RR::zero() {
             Some(true)
         } else {
             None
         }
     }
-    fn gcd(&self, other: &Self) -> Self {
+    fn gcd(&self, _other: &Self) -> Self {
         if *self != RR::zero() {
             RR::one()
         } else {

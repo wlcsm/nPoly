@@ -25,6 +25,7 @@ impl<P: Prime> FF<P> {
         FF(q % P::to_i64(), PhantomData)
     }
 
+    #[allow(dead_code)]
     pub fn new_unchecked(q: i64) -> Self {
         FF(q, PhantomData)
     }
@@ -88,7 +89,7 @@ impl<P: Prime> std::str::FromStr for FF<P> {
 }
 
 impl<P: Prime> ScalarRing for FF<P> {
-    const REGEX: &'static str = r"-?\d*";
+    const REGEX: &'static str = r"-?\d+";
     fn add_ass(&mut self, other: &Self) {
         self.0 = <FF<P>>::red(self.0 + other.0)
     }

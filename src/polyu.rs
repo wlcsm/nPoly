@@ -1,6 +1,5 @@
 use crate::algebras::polyring::*;
 use crate::algebras::*;
-use generic_array::arr;
 use std::cmp::Ordering;
 
 // Shorthand
@@ -34,10 +33,10 @@ impl Variate for UniIndex {
     type NumVar = U1;
 
     // TODO These get and set are not good and I should look for a way around this
-    fn get(&self, ind: usize) -> Option<&usize> {
+    fn get(&self, _ind: usize) -> Option<&usize> {
         Some(&self.0)
     }
-    fn set(&mut self, ind: usize, val: usize) -> Option<()> {
+    fn set(&mut self, _ind: usize, val: usize) -> Option<()> {
         self.0 = val;
         Some(())
     }
@@ -112,41 +111,19 @@ use std::fmt;
 // Problem is that it's hard to put an ordering on the coefficients because in finite fields
 // thats quite ambiguious. I need it in the "if x < 0" line
 // This will eventually have to be overcome some time.
-impl<'a, R: ScalarRing, P: PolyRing<Coeff = R>> fmt::Display for Poly<'a, P> {
+impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // let sign = |x: P::Coeff| {
-        //     if x < 0 {("-", x.neg())} else {("+", x)} };
-
-        // Formats a nomial: Assumes that num is not zero
-        let nomial = |num: &Term<P>| -> String {
-            let mut term = String::new();
-
-            if num.coeff != <P::Coeff>::one() {
-                term.push_str(&num.coeff.to_string());
-            } else if *num == Term::one() {
-                return num.coeff.to_string()
-            }
-
-            for (i, symb) in self.ring.symb().iter().enumerate() {
-                match num.deg.get(i).unwrap() {
-                    0 => {}
-                    1 => term.push_str("x"),
-                    d => term.push_str(&format!("{}^{}", symb, d)),
-                }
-            }
-            term
-        };
 
         // Because we don't want a potential "+" out the front of the first term
         if self.is_zero() {
             write!(f, "{}", <P::Coeff>::zero())
         } else {
-            let mut acc: String = nomial(&self.terms[0]);
+            let mut acc: String = self.terms[0].to_str(&self.ring);
 
             self.terms
                 .iter()
                 .skip(1)
-                .for_each(|x| acc.push_str(&format!(" + {}", nomial(x))));
+                .for_each(|x| acc.push_str(&format!(" + {}", x.to_str(&self.ring))));
 
             write!(f, "{}", acc)
         }

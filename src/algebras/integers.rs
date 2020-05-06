@@ -40,7 +40,7 @@ impl fmt::Display for ZZ {
 }
 
 impl ScalarRing for ZZ {
-    const REGEX: &'static str = r"-?\d*";
+    const REGEX: &'static str = r"-?\d+";
 
     fn add_ass(&mut self, other: &Self) {
         self.0 += other.0

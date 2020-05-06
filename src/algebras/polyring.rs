@@ -13,6 +13,10 @@ pub trait PolyRing: Eq + PartialEq + Clone + std::fmt::Debug {
 }
 pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug {}
 
+use generic_array::typenum::U2;
+
+impl VarNumber for U2 {}
+
 // The reason I have kept this generic for now (when at the moment there isn't any immediate
 // need to) is because I plan on implementing quotient rings for which I will need access to generic parameters
 // I have used a Vector even though it would probably be better to use a Generic array with the
@@ -117,10 +121,8 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 mod tests {
 
     use super::*;
-    use crate::algebras::integers::ZZ;
     use crate::parse::*;
     use crate::algebras::real::RR;
-    use crate::algebras::polyring::*;
     use crate::polyu::*;
 
 
@@ -165,10 +167,10 @@ impl<P: PolyRing> One for Term<P> {
 impl<P: PolyRing> Ring for Term<P> {
     type BaseRing = P::Coeff;
     // Group operations
-    fn add(&self, other: &Self) -> Self {
+    fn add(&self, _other: &Self) -> Self {
         unimplemented!()
     }
-    fn sub(&self, other: &Self) -> Self {
+    fn sub(&self, _other: &Self) -> Self {
         unimplemented!()
     }
     fn neg(&self) -> Self {
@@ -202,6 +204,42 @@ where
         }
     }
 }
+
+impl<P: PolyRing> Term<P> {
+    pub fn to_str(&self, ring: &P) -> String {
+
+        let mut term = self.coeff.to_string();
+
+        for (i, symb) in ring.symb().iter().enumerate() {
+            match self.deg.get(i).unwrap() {
+                0 => {}
+                1 => term.push(*symb),
+                d => term.push_str(&format!("{}^{}", symb, d)),
+            }
+        }
+        term
+    }
+}
+
+// #[cfg(test)]
+// mod tmp_tests {
+//     use super::*;
+//     use crate::algebras::real::RR;
+//     use crate::parse::*;
+//     use crate::polyu::*;
+//     use crate::polym::*;
+//     use generic_array::typenum::U2;
+//     #[test]
+//     fn term_display_test() {
+//         let ring = PRDomain::<RR, UniIndex, UnivarOrder>::new(vec!['x']);
+//         let a = Poly::from_str(&ring, "3.0x^2 + 5.0x^98").unwrap();
+//         println!("{}", a.lt().to_str(&ring));
+
+//         let ring = PRDomain::<RR, MultiIndex<U2>, Lex>::new(vec!['x', 'y']);
+//         let a = Poly::from_str(&ring, "3.0x^2y^4 + 5.0x^98y^7").unwrap();
+//         println!("{}", a.lt().to_str(&ring));
+//     }
+// }
 
 impl<F: Field, P: PolyRing<Coeff = F>> Term<P> {
     // Evaluates self / other
@@ -340,7 +378,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         }
 
         // Knowing which polynomial is bigger is advantages here
-        let (smol, bigg) = match <P::Ord>::cmp(&polya.lm(), &polyb.lm()) {
+        let (smol, bigg) = match polya.num_terms().cmp(&polyb.num_terms()) {
             Ordering::Less => (&polya, &polyb),
             _ => (&polyb, &polya),
         };

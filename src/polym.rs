@@ -78,13 +78,11 @@ impl<N: VarNumber> FromIterator<usize> for MultiIndex<N> {
     }
 }
 
-use std::marker::PhantomData;
-
 // TODO; Make this a macro to do all of them
 #[derive(Clone, Eq, PartialEq, Debug)]
-pub struct GLex<M: MultiIndexTrait>(PhantomData<M>);
+pub struct GLex();
 
-impl<M: MultiIndexTrait> MonomialOrdering<M> for GLex<M> {
+impl<M: MultiIndexTrait> MonomialOrdering<M> for GLex {
     fn cmp(a: &M, b: &M) -> Ordering {
         <M>::glex(a, b)
     }
@@ -149,11 +147,12 @@ impl<N: VarNumber> Variate for MultiIndex<N> {
         Some(MultiIndex::new(new_indices))
     }
     fn divides(&self, other: &Self) -> Option<bool> {
+        // Evaluates self | other, "self divides other"
         Some(
             self.indices
                 .iter()
                 .zip(other.indices.iter())
-                .all(|(a, b)| a >= b),
+                .all(|(a, b)| a <= b),
         )
     }
     fn gcd(&self, other: &Self) -> Self {

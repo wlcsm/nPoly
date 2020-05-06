@@ -112,14 +112,14 @@ impl ScalarRing for CC {
 }
 
 impl EuclideanDomain for CC {
-    fn divides(&self, other: &Self) -> Option<bool> {
+    fn divides(&self, _other: &Self) -> Option<bool> {
         if *self != CC::zero() {
             Some(true)
         } else {
             None
         }
     }
-    fn gcd(&self, other: &Self) -> Self {
+    fn gcd(&self, _other: &Self) -> Self {
         if *self != CC::zero() {
             CC::one()
         } else {
