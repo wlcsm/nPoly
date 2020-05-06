@@ -1,9 +1,10 @@
 pub mod complex;
+pub mod finite_field;
 pub mod integers;
 pub mod polyring;
-pub mod finite_field;
+pub mod real;
 
-/// The original motivation for making my own copies of the sub and add traits is so that 
+/// The original motivation for making my own copies of the sub and add traits is so that
 /// I can borrow self rather than taking ownership
 
 // The group trait is used in the MonomialIndex trait
@@ -24,7 +25,10 @@ pub trait Ring: Zero + One + Sized + Eq + Clone {
     fn mul(&self, other: &Self) -> Self;
 }
 
-pub trait ScalarRing: Ring + Copy + std::fmt::Debug {
+pub trait ScalarRing:
+    Ring + Copy + std::fmt::Debug + std::str::FromStr + std::fmt::Display
+{
+    const REGEX: &'static str;
     fn add_ass(&mut self, other: &Self);
     fn sub_ass(&mut self, other: &Self);
     fn mul_ass(&mut self, other: &Self);

@@ -4,7 +4,6 @@ extern crate chrono;
 use crate::algebras::*;
 use crate::mathutils::log2_unchecked;
 
-
 pub trait SupportsFFT: Field {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
@@ -12,14 +11,15 @@ pub trait SupportsFFT: Field {
 }
 
 // Warning: Does it infix by default for speed, infix on a_sig
-pub fn eval_interp<F>(a_sig: &mut [F], b_sig: &mut [F]) -> Result<(), &'static str> 
-    where F: SupportsFFT {
-
+pub fn eval_interp<F>(a_sig: &mut [F], b_sig: &mut [F]) -> Result<(), &'static str>
+where
+    F: SupportsFFT,
+{
     let n = a_sig.len();
 
     // Constraint checks
     if n != b_sig.len() || !n.is_power_of_two() {
-        return Err("Improper lengths of input slices")
+        return Err("Improper lengths of input slices");
     }
 
     // Evaluate the polynomials
@@ -36,9 +36,7 @@ pub fn eval_interp<F>(a_sig: &mut [F], b_sig: &mut [F]) -> Result<(), &'static s
     Ok(())
 }
 
-
 pub fn dft<F: SupportsFFT>(signal: &mut [F], inv: bool) {
-
     let n = signal.len();
     let result = signal.to_vec();
 
@@ -50,9 +48,11 @@ pub fn dft<F: SupportsFFT>(signal: &mut [F], inv: bool) {
 
     // F(k) = \sum^n_{j=0} x_j e^{-2\pi i jk / n}
     for k in 0..n {
-        let term = result.iter().enumerate()
-                                    .map(|(i, c)| rou[modx(k, i)].mul(c))
-                                    .fold(<F>::zero(), |a, b| a.add(&b));
+        let term = result
+            .iter()
+            .enumerate()
+            .map(|(i, c)| rou[modx(k, i)].mul(c))
+            .fold(<F>::zero(), |a, b| a.add(&b));
         signal[k] = term;
     }
 }
@@ -68,28 +68,28 @@ pub fn perform_fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'
         2 | 4 => {
             dft(signal, inv);
             Ok(())
-        },
+        }
         _ => {
             go_fast(signal, inv);
             Ok(())
-        },
+        }
     }
 }
 
 pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     // Assumes that the length of 'signal' is >= 4
 
-    let n   = signal.len();
+    let n = signal.len();
     let rou = <F>::rou(n, inv); // Generates roots of unity
 
     // Does first iteration and puts into reverse bit order.
     for (i, j) in (0..n / 2).zip(n / 2..n).step_by(2) {
-        let x_0       = signal[i];
-        let x_0_n2    = signal[j];
-        let x_1       = signal[i + 1];
-        let x_1_n2    = signal[j + 1];
-        signal[i]     = x_0.add(&x_0_n2);
-        signal[j]     = x_1.add(&x_1_n2);
+        let x_0 = signal[i];
+        let x_0_n2 = signal[j];
+        let x_1 = signal[i + 1];
+        let x_1_n2 = signal[j + 1];
+        signal[i] = x_0.add(&x_0_n2);
+        signal[j] = x_1.add(&x_1_n2);
         signal[i + 1] = x_0.sub(&x_0_n2);
         signal[j + 1] = x_1.sub(&x_1_n2);
     }
@@ -98,7 +98,7 @@ pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     // Starts at index two because we already handled the first one
     for i in 2..=log2_unchecked(n) {
         let flut = 1 << i; // No. of elements in a flutter
-        // Iterate over all the flutters, j is their starting index
+                           // Iterate over all the flutters, j is their starting index
         for j in (0..n).step_by(flut) {
             // Width of the k-flutter (number of elements)
             for (k, l) in (j..j + (flut >> 1)).zip(j + (flut >> 1)..j + flut) {
@@ -111,16 +111,14 @@ pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     extern crate chrono;
     extern crate rand;
 
-    use chrono::*;
-    use crate::fast_mult::*;
     use crate::algebras::complex::CC;
-    // use crate::algebras::integers::ZZ;
+    use crate::fast_mult::*;
+    use chrono::*;
     use crate::algebras::polyring::*;
     use crate::polyu::*;
 
@@ -128,7 +126,7 @@ mod tests {
 
     #[test]
     fn bench_dense_main() {
-        let ring = PRDomain::univar(1);
+        let ring = PRDomain::<CC, UniIndex, UnivarOrder>::new(vec!['x']);
 
         // Note all coefficients are nonzero
         let dist = Uniform::from(1..100);
@@ -147,7 +145,8 @@ mod tests {
             println!("-------------------------------------------");
             println!("Number of elements = {}", n);
             println!("-------------------------------------------");
-            println!("FFT: {:?}",
+            println!(
+                "FFT: {:?}",
                 Duration::span(|| {
                     a.fast_mult(&b);
                 })
@@ -168,7 +167,6 @@ mod tests {
         // let a = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(1)]);
         // let b = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(3)]);
         // let c = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(2), ZZ(1)]);
-
 
         // assert_eq!(a.mul(&b), a.fast_mult(&b));
         // assert_eq!(b.mul(&c), b.fast_mult(&c));

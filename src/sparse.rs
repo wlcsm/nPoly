@@ -1,4 +1,4 @@
-// This is commented out because I dont know when I'll be using it and I dont want to 
+// This is commented out because I dont know when I'll be using it and I dont want to
 // have to keep updating my design changes here
 
 // use crate::polyu::*;
@@ -22,23 +22,23 @@
 // }
 // impl<T: SupportsFFT> Subtree<F> {
 
-//     // Note: This is dependent on the ordering of arg1 and arg2. 
-//     //       arg2's path is assumed to be greater than arg1's 
+//     // Note: This is dependent on the ordering of arg1 and arg2.
+//     //       arg2's path is assumed to be greater than arg1's
 //     pub fn can_combine(&self, arg2: &Subtree<F>) -> Option<usize> {
 //         // Find the lowest branch
 //         let lowest = findlowestbranch(self.pos, arg2.pos);
 
 //         // Check all the bits before the lowest connecting branch are 1's
-//         let tester = (1 << (lowest - arg2.pos.depth)) - 1; 
+//         let tester = (1 << (lowest - arg2.pos.depth)) - 1;
 //         if (tester & arg2.pos.path) == tester { Some(lowest) } else { None }
 //     }
 
-//     // Takes a subtree and promotes/expands it up the tree, assuming the 
+//     // Takes a subtree and promotes/expands it up the tree, assuming the
 //     // coefficients in its sister subtree is zero
 //     pub fn expand(&mut self, depth: usize) {
 //         while self.pos.depth != depth {
 //             // If the digit is a zero it slides to the right
-//             if self.pos.path % 2 == 0 { 
+//             if self.pos.path % 2 == 0 {
 //                 self.coeffs.extend(self.coeffs.clone())
 //             } else {
 //             // If the digit is a one it slides to the left
@@ -82,7 +82,7 @@
 //     }
 // }
 
-// /// Converts the monomials of the polynomial into instances of Subtree<F>, then sorts them 
+// /// Converts the monomials of the polynomial into instances of Subtree<F>, then sorts them
 // /// with respect to their reverse bit encoding
 // pub(crate) fn revbit<T: SupportsFFT>(input: &Poly<Univariate>, n: usize) -> Vec<Subtree<F>> {
 
@@ -90,8 +90,8 @@
 //     let revbits = |x: u32| x.reverse_bits() >> (32 - n);
 
 //     // Makes each element a subtree (inefficient I know)
-//     let mut result: Vec<Subtree<F>> 
-//         = input.terms.iter().map(|Term { coeff, deg }| Subtree { 
+//     let mut result: Vec<Subtree<F>>
+//         = input.terms.iter().map(|Term { coeff, deg }| Subtree {
 //                                         coeffs: vec![*coeff],
 //                                         pos   : Position {
 //                                             path  : revbits(deg.0 as u32) as u32,
@@ -105,7 +105,7 @@
 //     result
 // }
 
-// // Does a linear search for the largest bit prefix of s and t which equates to finding the 
+// // Does a linear search for the largest bit prefix of s and t which equates to finding the
 // // path of the smallest subtree connecting them in this case
 // fn findlowestbranch(mut arg1: Position, arg2: Position) -> usize {
 //     // Make the paths the same length
@@ -113,11 +113,10 @@
 //     arg1.path = if a < 0 {arg1.path >> -a} else {arg1.path << a};
 
 //     // Under a bitwise XOR, the common prefix of the two paths will be all zeros
-//     // So the leading one signals the end of the common prefix 
+//     // So the leading one signals the end of the common prefix
 //     let res = arg1.path ^ arg2.path;
 //     ((32 - res.leading_zeros()) + arg2.depth as u32) as usize
 // }
-
 
 // pub(crate) fn sparse_eval<T: SupportsFFT>(input: Poly<Univariate>, n: usize) -> Vec<F> {
 
@@ -140,7 +139,7 @@
 //             }
 //         }
 //     }
-    
+
 //     println!("Result so far = {:?}", result);
 
 //     // Clean up everything

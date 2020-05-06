@@ -1,22 +1,25 @@
 // Taken inspiration from rustyline's error module
-use std::io;
 use std::fmt;
+use std::io;
 use std::num;
 
 #[derive(Debug)]
 pub enum PolyErr {
     Io(io::Error),
     EmptyPoly,
-    Parse(num::ParseIntError)
+    Parse(num::ParseIntError),
+    ParsePolyError,
 }
 
 impl fmt::Display for PolyErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             PolyErr::Io(ref err) => err.fmt(f),
-            PolyErr::EmptyPoly => write!(f, "{}",
-                "Vector to initialise polynomial cannot be empty",),
+            PolyErr::EmptyPoly => {
+                write!(f, "{}", "Vector to initialise polynomial cannot be empty",)
+            }
             PolyErr::Parse(ref err) => err.fmt(f),
+            PolyErr::ParsePolyError => write!(f, "{}", "You did it wrong"),
         }
     }
 }

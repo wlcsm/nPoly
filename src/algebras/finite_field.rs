@@ -1,13 +1,13 @@
-use typenum::marker_traits::Unsigned;
-use std::marker::PhantomData;
 use crate::algebras::*;
-use typenum::{U7};
+use std::marker::PhantomData;
+use typenum::marker_traits::Unsigned;
+use typenum::U7;
 
 trait Prime: Unsigned + Copy + Eq {}
 impl Prime for U7 {}
 
 #[derive(Clone, Copy)]
-struct FF<P: Prime> (i64, PhantomData<P>);
+struct FF<P: Prime>(i64, PhantomData<P>);
 
 // I need to reimplment this because I'm allowing the numbers in the FF struct to be
 // stored positively or negatively, so I need to account for these two forms
@@ -22,7 +22,7 @@ impl<P: Prime> std::cmp::Eq for FF<P> {}
 impl<P: Prime> FF<P> {
     // Automatically reduces the number
     pub fn new(q: i64) -> Self {
-        FF(q % P::to_i64() , PhantomData)
+        FF(q % P::to_i64(), PhantomData)
     }
 
     pub fn new_unchecked(q: i64) -> Self {
@@ -49,10 +49,14 @@ impl<P: Prime> fmt::Display for FF<P> {
 }
 
 impl<P: Prime> Zero for FF<P> {
-    fn zero() -> Self { FF::new(0) }
+    fn zero() -> Self {
+        FF::new(0)
+    }
 }
 impl<P: Prime> One for FF<P> {
-    fn one() -> Self { FF::new(1) }
+    fn one() -> Self {
+        FF::new(1)
+    }
 }
 
 impl<P: Prime> Ring for FF<P> {
@@ -72,7 +76,19 @@ impl<P: Prime> Ring for FF<P> {
     }
 }
 
+impl<P: Prime> std::str::FromStr for FF<P> {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.parse::<i64>() {
+            Ok(n) => Ok(FF::new(n)),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 impl<P: Prime> ScalarRing for FF<P> {
+    const REGEX: &'static str = r"-?\d*";
     fn add_ass(&mut self, other: &Self) {
         self.0 = <FF<P>>::red(self.0 + other.0)
     }
@@ -88,7 +104,7 @@ impl<P: Prime> ScalarRing for FF<P> {
 mod tests {
 
     use super::*;
-    use typenum::{U7};
+    use typenum::U7;
 
     #[test]
     fn basics() {

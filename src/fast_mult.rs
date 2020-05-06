@@ -1,8 +1,8 @@
+use crate::algebras::polyring::*;
 use crate::algebras::*;
 use crate::fft::*;
-use crate::polyu::*;
-use crate::algebras::polyring::*;
 use crate::mathutils::log2_unchecked;
+use crate::polyu::*;
 
 pub trait FastMult {
     fn fast_mult(&self, b: &Self) -> Self;
@@ -41,9 +41,7 @@ fn to_coeffs<P: PolyRing>(input: &Vec<Term<P>>, n: usize) -> Vec<P::Coeff> {
 
 // TODO these two implementations should be one macro
 impl<'a, T: SupportsFFT> FastMult for PolyU<'a, T> {
-
     fn fast_mult(&self, other: &Self) -> Self {
-
         let n = (self.deg() + other.deg() + 1).next_power_of_two();
         let mut a_sig = to_coeffs(&self.terms, n);
         let mut b_sig = to_coeffs(&other.terms, n);
@@ -77,7 +75,7 @@ impl<'a, T: SupportsFFT> FastMult for PolyU<'a, T> {
 //         // Because we converted it to complex for the ROU
 //         // We also need to normalise it here
 //         let c_parsed = a_sig.into_iter()
-//                             .map(|x| 
+//                             .map(|x|
 //                                 ZZ((x.0 / n as f64).re.round() as i32)
 //                             ).collect();
 

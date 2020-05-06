@@ -1,10 +1,9 @@
 extern crate num_complex;
 
-use num_complex::Complex64;
 use crate::algebras::*;
 use crate::fft::SupportsFFT;
+use num_complex::Complex64;
 use std::f64::consts::PI;
-
 
 #[derive(Clone, Copy, Debug)]
 pub struct CC(pub Complex64);
@@ -32,15 +31,20 @@ impl CC {
 }
 
 impl Zero for CC {
-    fn zero() -> Self { CC(Complex64::new(0.0, 0.0)) }
+    fn zero() -> Self {
+        CC(Complex64::new(0.0, 0.0))
+    }
 }
 
 impl One for CC {
-    fn one() -> Self { CC(Complex64::new(1.0, 0.0)) }
+    fn one() -> Self {
+        CC(Complex64::new(1.0, 0.0))
+    }
 }
 
 // <><><><><> Ring Implementation <><><><><> //
 impl Ring for CC {
+    type BaseRing = CC;
 
     fn add(&self, other: &Self) -> Self {
         CC(self.0 + other.0)
@@ -56,8 +60,45 @@ impl Ring for CC {
     }
 }
 
+use regex::Regex;
+
+impl std::str::FromStr for CC {
+    type Err = std::num::ParseFloatError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let cc_regex =
+            Regex::new(r"^(?P<re>-?\d*(?:\.\d*))\s*(?:\+|-)\s*(?:(?P<im>\d*(?:\.\d*))i)$").unwrap();
+        assert!(cc_regex.is_match(s));
+        let caps = cc_regex.captures(s).unwrap();
+        Ok(CC(Complex64::new(
+            caps["re"].parse::<f64>()?,
+            caps["im"].parse::<f64>()?,
+        )))
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parsing_test() {
+        let a = "3.0 + 5.0i".parse::<CC>();
+        println!("{:?}", a);
+    }
+}
+
+use std::fmt;
+
+impl fmt::Display for CC {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // <><><><><> Scalar Ring Implementation <><><><><> //
 impl ScalarRing for CC {
+    // Regex doesn't allow space on left or right hand side
+    const REGEX: &'static str = r"-?\d*\.\d*\s*(\+|-)\s*\d*\.\d*i";
     fn add_ass(&mut self, other: &Self) {
         self.0 += other.0
     }
@@ -71,12 +112,19 @@ impl ScalarRing for CC {
 }
 
 impl EuclideanDomain for CC {
-
     fn divides(&self, other: &Self) -> Option<bool> {
-        other.0.checked_rem_euclid(self.0).and_then(|r| Some(r == 0))
+        if *self != CC::zero() {
+            Some(true)
+        } else {
+            None
+        }
     }
     fn gcd(&self, other: &Self) -> Self {
-        if self.0 == 0 { *other } else {CC(other.0 % self.0).gcd(&self) }
+        if *self != CC::zero() {
+            CC::one()
+        } else {
+            CC::zero()
+        }
     }
     fn lcm(&self, other: &Self) -> Self {
         CC((self.0 * other.0) / self.gcd(&other).0)
@@ -85,16 +133,16 @@ impl EuclideanDomain for CC {
 
 impl Field for CC {
     fn div(&self, other: &Self) -> Option<CC> {
-        match other {
-            CC::zero() => None,
-            n          => Some(CC(self.0 / other.0)),
+        if *other == CC::zero() {
+            None
+        } else {
+            Some(CC(self.0 / other.0))
         }
     }
 }
 
 // <><><><><> Supports FFT Implementation <><><><><> //
 impl SupportsFFT for CC {
-
     fn rou(n: usize, inv: bool) -> Vec<Self> {
         // Generates all the nth roots of unity
         // Changes it depending on whether computing the dft or the inverse
@@ -103,7 +151,7 @@ impl SupportsFFT for CC {
         (0..n).map(|k| CC(base.scale(k as f64).exp())).collect()
     }
 
-    fn divby2(self, n: usize) -> Self {
-        CC(self.0 / (1 << n) as f64)
+    fn divby2(&mut self, n: usize) {
+        self.0 /= (1 << n) as f64
     }
 }
