@@ -1,7 +1,32 @@
 use crate::algebras::*;
+use alga::general::{Additive, Identity, AbstractMagma, TwoSidedInverse, Multiplicative};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct ZZ(pub i32);
+
+impl Identity<Additive> for ZZ {
+    fn identity() -> Self {
+        ZZ(0)
+    }
+}
+impl TwoSidedInverse<Additive> for ZZ {
+    fn two_sided_inverse(&self) -> Self {
+        ZZ(-self.0)
+    }
+    fn two_sided_inverse_mut(&mut self) {
+        self.0 *= -1
+    }
+}
+impl AbstractMagma<Additive> for ZZ {
+    fn operate(&self, other: &Self) -> Self {
+        ZZ(self.0 + other.0)
+    }
+}
+impl Identity<Multiplicative> for ZZ {
+    fn identity() -> Self {
+        ZZ(1)
+    }
+}
 
 impl One for ZZ {
     fn one() -> Self {

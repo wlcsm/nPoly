@@ -1,67 +1,69 @@
 use crate::algebras::polyring::*;
-use crate::algebras::*;
 
 #[derive(Debug, Clone)]
 pub struct Ideal<'a, P: PolyRing> {
-    gens: Vec<Poly<'a, P>>,
+    pub gens: Vec<Poly<'a, P>>,
 }
 
 impl<'a, P: PolyRing> Ideal<'a, P> {
-    fn new(gens: Vec<Poly<'a, P>>) -> Self {
+    pub fn new(gens: Vec<Poly<'a, P>>) -> Self {
         Ideal { gens }
     }
-    fn add(&mut self, item: Poly<'a, P>) {
+    pub fn add(&mut self, item: Poly<'a, P>) {
         if !self.gens.contains(&item) {
             self.gens.push(item)
         }
     }
 }
 
-use std::fmt;
+// Want to take ownership so that the ideal doesn't change.
+// If you want the ideal again then you need to get it from the destructor
+#[derive(Debug, Clone)]
+pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
+    gens: Vec<Term<P>>,
+    original: Option<&'b Ideal<'a, P>>
 
-pub fn to_str<'a, P: PolyRing>(a: &Vec<Poly<'a, P>>) -> String {
-    let mut acc = a[0].to_string();
-    for s in a.iter().skip(1) {
-        acc = format!("{}, {}", acc, s);
-    }
-    acc
 }
 
-impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut acc = self.gens[0].to_string();
-        for s in self.gens.iter().skip(1) {
-            acc = format!("{}, {}", acc, s);
+impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
+    pub fn new(gens: Vec<Term<P>>) -> Self {
+        // gens.sort_by(|a, b| <P::Ord>::cmp(&a.deg, &b.deg));
+        MonomialIdeal { gens, original: None}
+    } 
+    pub fn from(I: &'b Ideal<'a, P>) -> Self {
+        MonomialIdeal {
+            gens: I.gens.iter().map(|a| a.lt().clone()).collect(),
+            original: Some(I)
         }
-        write!(f, "Ideal( {} )", acc)
     }
-}
+    pub fn add(&mut self, item: Term<P>) {
+        if !self.is_in(&item) {
+            self.gens.push(item)
+        }
+    }
+    pub fn is_in(&self, term: &Term<P>) -> bool {
+        self.gens.iter().any(|t| t.divides(term).unwrap())
+    }
 
-pub fn bb_algorithm<'a, F: Field, P: PolyRing<Coeff=F>>(g: &Ideal<'a, P>) -> Ideal<'a, P> {
-    // "New" are the newly added polynomials that we need to check
-    // "Acc" is the accumulator for the new Groebner basis
-    // "Next" are the next values that we need to transfer into the "New" vector
-    let mut new = g.gens.clone();
-    let mut acc = g.clone();
-
-
-    while !new.is_empty() {
-        let mut next = Vec::new();
-        while let Some(f) = new.pop() {
-            for g in &acc.gens {
-                let r = f.s_poly(&g).reduce(&acc);
-                if !r.is_zero() {
-                    next.push(r)
+    pub fn in_and_get(&self, term: &Term<P>) -> Option<&Poly<'a, P>> {
+        // If term is in the ideal it will return the element that corresponds to it
+        match self.original {
+            Some(I) => {
+                for (lm, poly) in izip!(self.gens.iter(), I.gens.iter()) {
+                    if lm.divides(term).unwrap() {
+                        return Some(&poly)
+                    }
                 }
-            }
-            acc.add(f);
+                None
+            },
+            None => None
         }
-        new = next;
     }
-    acc
 }
 
-pub fn is_groebner_basis<'a, F: Field, P: PolyRing<Coeff=F>>(g: &Ideal<'a, P>) -> bool {
+use crate::algebras::EuclideanDomain;
+
+pub fn is_groebner_basis<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> bool {
 
     let n = g.gens.len();
     for i in 0..n {
@@ -76,7 +78,7 @@ pub fn is_groebner_basis<'a, F: Field, P: PolyRing<Coeff=F>>(g: &Ideal<'a, P>) -
     true
 }
 
-impl<'a, F: Field, P: PolyRing<Coeff = F>> Poly<'a, P> {
+impl<'a, P: FPolyRing> Poly<'a, P> {
     fn pop(&mut self) -> Option<Term<P>> {
         self.terms.pop()
     }
@@ -89,7 +91,7 @@ impl<'a, F: Field, P: PolyRing<Coeff = F>> Poly<'a, P> {
     }
 }
 
-impl<'a, F: Field, P: PolyRing<Coeff = F>> Poly<'a, P> {
+impl<'a, P: FPolyRing> Poly<'a, P> {
     fn reduce(&self, g: &Ideal<'a, P>) -> Self {
         self.divpolys(&g.gens).1
     }
@@ -147,14 +149,14 @@ mod tests {
     }
 
     #[test]
-    fn bb_alg_test() {
-        let ring = PRDomain::<RR, MultiIndex<U2>, GLex>::new(vec!['x', 'y']);
-        let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
-        let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
-        let r = bb_algorithm(&Ideal::new(vec![a, b]));
-        println!("r = {}", r);
-        println!("is GB? = {}", is_groebner_basis(&r));
-    }
+    // fn bb_alg_test() {
+    //     let ring = PRDomain::<RR, MultiIndex<U2>, GLex>::new(vec!['x', 'y']);
+    //     let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
+    //     let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
+    //     let r = bb_algorithm(&Ideal::new(vec![a, b]));
+    //     println!("r = {:?}", r);
+    //     println!("is GB? = {:?}", is_groebner_basis(&r));
+    // }
 
     #[test]
     fn is_gb_test() {

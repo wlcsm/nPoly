@@ -1,7 +1,9 @@
+#![feature(associated_type_bounds)]
 /// The polynomial crate
 extern crate generic_array;
 #[macro_use]
 extern crate itertools;
+extern crate nalgebra;
 
 pub mod algebras;
 pub mod error;

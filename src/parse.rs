@@ -91,8 +91,6 @@ mod tests {
         let ring = PRDomain::<ZZ, MultiIndex<U2>, Lex>::new(vec!['x', 'y']);
         let a = Poly::from_str(&ring, "3x^2y^6 + 5x^98y^2").unwrap();
         let b = Poly::from_str(&ring, "5x^6").unwrap();
-        println!("a = {:?}", a);
-        println!("b = {:?}", b);
         println!("a = {}", a);
         println!("b = {}", b);
     }

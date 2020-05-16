@@ -13,6 +13,9 @@ pub trait PolyRing: Eq + PartialEq + Clone + std::fmt::Debug {
 }
 pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug {}
 
+// This is where I use the associated_type_bounds feature
+pub trait FPolyRing: PolyRing<Coeff: Field> {}
+
 use generic_array::typenum::U2;
 
 impl VarNumber for U2 {}
@@ -31,6 +34,13 @@ pub struct PRDomain<R: ScalarRing, U: Variate, M: MonomialOrdering<U>> {
     pub(crate) vars: Vec<char>,
     ring_parameters: PhantomData<(R, U, M)>,
 }
+
+impl<F, U, M> FPolyRing for PRDomain<F, U, M> 
+where
+    F: Field,
+    U: Variate,
+    M: MonomialOrdering<U>,
+{}
 
 impl<R, U, M> Debug for PRDomain<R, U, M>
 where
@@ -241,7 +251,7 @@ impl<P: PolyRing> Term<P> {
 //     }
 // }
 
-impl<F: Field, P: PolyRing<Coeff = F>> Term<P> {
+impl<P: FPolyRing> Term<P> {
     // Evaluates self / other
     pub fn div(&self, other: Self) -> Option<Self> {
         if other.divides(&self) == Some(true) {
@@ -288,6 +298,19 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
     pub fn lm(&self) -> P::Var {
         self.lt().deg
+    }
+
+    pub fn has(&self, t: &P::Var) -> Option<P::Coeff> {
+        // Does a binary search for the term, returns the coefficient if 
+        // it was found and nonzero
+        match self.terms.binary_search_by(|a| <P::Ord>::cmp(&a.deg, &t)) {
+            Ok(i) => if self.terms[i].coeff != <P::Coeff>::zero() {
+                Some(self.terms[i].coeff)
+            } else {
+                None
+            },
+            Err(_) => None,
+        }
     }
 }
 
