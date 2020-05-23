@@ -11,11 +11,13 @@ pub fn f4<'a, P: FPolyRing>(F: Vec<Poly<'a, P>>) -> Ideal<'a, P> {
     while !subsets.is_empty() {
         let selection: Vec<(usize, usize)> = choose_subset(&mut subsets);
 
-        let L: Vec<Poly<'a, P>> = selection.into_iter().map(|(i, j)| left_hand_s_poly(&G.gens[i], &G.gens[j]) ).collect();
-        let mut M = ComputeM(L, &G);
-        let M_init = MonomialIdeal::new(M.iter().map(|m| m.lt()).collect());
-        row_reduce(&mut M);
-        let n_plus: Vec<Poly<'a, P>> = M.into_iter().filter(|n| !M_init.is_in(&n.lt())).collect();
+        let mut L: Vec<Poly<'a, P>> = selection.into_iter().map(|(i, j)| left_hand_s_poly(&G.gens[i], &G.gens[j]) ).collect();
+        ComputeM(&mut L, &G);
+        let m_init = MonomialIdeal::new(L.iter().map(|m| m.lt()).collect());
+
+        // Row reduction and find the new elements
+        row_reduce(&mut L);
+        let n_plus: Vec<Poly<'a, P>> = L.into_iter().filter(|n| !M_init.is_in(&n.lt())).collect();
 
         for n in n_plus {
             t += 1;
@@ -67,34 +69,30 @@ pub fn choose_subset(B: &mut Vec<(usize, usize)>) -> Vec<(usize, usize)> {
 }
 
 
-pub fn ComputeM<'a, P: FPolyRing>(L: Vec<Poly<'a, P>>, G: &Ideal<'a, P>) -> Vec<Poly<'a, P>> {
-
-    // TODO should just mutate L
-    let mut H = L.clone();
+pub fn ComputeM<'a, P: FPolyRing>(L: &mut Vec<Poly<'a, P>>, G: &Ideal<'a, P>) {
 
     // This line is a bit of a hack
     let g_init = MonomialIdeal::from(&G);
 
-    H.sort_by(|a, b| <P::Ord>::cmp(&a.lt().deg, &b.lt().deg));
-    row_reduce(&mut H);
+    L.sort_by(|a, b| <P::Ord>::cmp(&a.lt().deg, &b.lt().deg));
+    row_reduce(L);
 
     let mut i = 0;
 
-    while i < H.len() {
+    while i < L.len() {
         let mut aux = Vec::new();
 
         // TODO This isn't removing duplicates
-        for term in H[i].terms.iter() {
+        for term in L[i].terms.iter() {
             // If term is in G_init, then give back the scaled f
             if let Some(poly) = g_init.in_and_get(&term) {
                 let p = poly.clone();
                 aux.push(p.term_scale(&term.div(poly.lt()).unwrap()))
             }
         }
-        H.append(&mut aux);
+        L.append(&mut aux);
         i += 1;
     }
-    H
 }
 
 

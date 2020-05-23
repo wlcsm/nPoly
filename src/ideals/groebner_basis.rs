@@ -25,7 +25,7 @@ pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
 
 }
 
-impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
+impl<'a, 'b,P: FPolyRing> MonomialIdeal<'a, 'b, P> {
     pub fn new(gens: Vec<Term<P>>) -> Self {
         // gens.sort_by(|a, b| <P::Ord>::cmp(&a.deg, &b.deg));
         MonomialIdeal { gens, original: None}
