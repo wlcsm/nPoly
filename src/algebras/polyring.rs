@@ -16,9 +16,10 @@ pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug {}
 // This is where I use the associated_type_bounds feature
 pub trait FPolyRing: PolyRing<Coeff: Field> {}
 
-use generic_array::typenum::U2;
+use generic_array::typenum::{U2, U3};
 
 impl VarNumber for U2 {}
+impl VarNumber for U3 {}
 
 // The reason I have kept this generic for now (when at the moment there isn't any immediate
 // need to) is because I plan on implementing quotient rings for which I will need access to generic parameters
@@ -219,12 +220,16 @@ where
     }
 
     fn divides(&self, other: &Self) -> Option<bool> {
+        // Checks if a term is divisible by another term. For this to occur both the monomial and the coefficients, 
+        // need to divide each other. This returns a zero if the coefficient of the divisor is zero.
         match (
             self.coeff.divides(&other.coeff),
             self.deg.divides(&other.deg),
         ) {
             (Some(a), Some(b)) => Some(a && b),
-            _ => None,
+            // Note that a index dividing an index will always return a Some() value
+            (None, _) => None,
+            _ => Some(false),
         }
     }
 }
@@ -382,7 +387,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         if scalar == <P::Coeff>::zero() {
             self.clone_from(&Poly::zero(&self));
         } else {
-            self.elementwise_map_mut(|t| t.coeff = t.coeff.neg())
+            self.elementwise_map_mut(|t| t.coeff.mul_ass(&scalar))
         }
     }
 
@@ -390,7 +395,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         Poly::from_terms(self.terms.iter().map(map).collect(), self.ring)
     }
 
-    pub fn elementwise_map_mut(&mut self, map: fn(&mut Term<P>)) {
+    pub fn elementwise_map_mut(&mut self, map: impl Fn(&mut Term<P>)) {
         self.terms.iter_mut().for_each(map)
     }
 

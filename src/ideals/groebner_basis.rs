@@ -7,14 +7,33 @@ pub struct Ideal<'a, P: PolyRing> {
 
 impl<'a, P: PolyRing> Ideal<'a, P> {
     pub fn new(gens: Vec<Poly<'a, P>>) -> Self {
-        Ideal { gens }
+        Ideal { 
+            gens: gens.into_iter().filter(|t| !t.is_zero()).collect()
+        }
     }
     pub fn add(&mut self, item: Poly<'a, P>) {
-        if !self.gens.contains(&item) {
+        if !self.gens.contains(&item) && !item.is_zero() {
             self.gens.push(item)
         }
     }
+    pub fn num_gens(&self) -> usize {
+        self.gens.len()
+    }
 }
+
+use std::fmt;
+
+impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Ideal (\n {} )", 
+            self.gens.iter()
+                .map(|p| format!("{}", p))
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
+    }
+}
+
 
 // Want to take ownership so that the ideal doesn't change.
 // If you want the ideal again then you need to get it from the destructor
@@ -24,11 +43,13 @@ pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
     original: Option<&'b Ideal<'a, P>>,
 }
 
+use crate::algebras::*;
+
 impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
     pub fn new(gens: Vec<Term<P>>) -> Self {
-        // gens.sort_by(|a, b| <P::Ord>::cmp(&a.deg, &b.deg));
+        // Take out any zeros
         MonomialIdeal {
-            gens,
+            gens: gens.into_iter().filter(|t| *t != Term::zero()).collect(),
             original: None,
         }
     }
@@ -39,7 +60,7 @@ impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
         }
     }
     pub fn add(&mut self, item: Term<P>) {
-        if !self.is_in(&item) {
+        if !self.is_in(&item) && item != Term::zero() {
             self.gens.push(item)
         }
     }
@@ -48,7 +69,7 @@ impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
         self.gens.iter().any(|t| t.divides(term).unwrap())
     }
 
-    pub fn in_and_get(&self, term: &Term<P>) -> Option<&Poly<'a, P>> {
+    pub fn get_poly(&self, term: &Term<P>) -> Option<&Poly<'a, P>> {
         // If term is in the ideal it will return the element that corresponds to it
         match self.original {
             Some(ideal) => {
