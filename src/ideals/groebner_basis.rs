@@ -21,19 +21,21 @@ impl<'a, P: PolyRing> Ideal<'a, P> {
 #[derive(Debug, Clone)]
 pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
     gens: Vec<Term<P>>,
-    original: Option<&'b Ideal<'a, P>>
-
+    original: Option<&'b Ideal<'a, P>>,
 }
 
-impl<'a, 'b,P: FPolyRing> MonomialIdeal<'a, 'b, P> {
+impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
     pub fn new(gens: Vec<Term<P>>) -> Self {
         // gens.sort_by(|a, b| <P::Ord>::cmp(&a.deg, &b.deg));
-        MonomialIdeal { gens, original: None}
-    } 
-    pub fn from(I: &'b Ideal<'a, P>) -> Self {
         MonomialIdeal {
-            gens: I.gens.iter().map(|a| a.lt().clone()).collect(),
-            original: Some(I)
+            gens,
+            original: None,
+        }
+    }
+    pub fn from(poly_ideal: &'b Ideal<'a, P>) -> Self {
+        MonomialIdeal {
+            gens: poly_ideal.gens.iter().map(|a| a.lt().clone()).collect(),
+            original: Some(poly_ideal),
         }
     }
     pub fn add(&mut self, item: Term<P>) {
@@ -41,6 +43,7 @@ impl<'a, 'b,P: FPolyRing> MonomialIdeal<'a, 'b, P> {
             self.gens.push(item)
         }
     }
+
     pub fn is_in(&self, term: &Term<P>) -> bool {
         self.gens.iter().any(|t| t.divides(term).unwrap())
     }
@@ -48,15 +51,15 @@ impl<'a, 'b,P: FPolyRing> MonomialIdeal<'a, 'b, P> {
     pub fn in_and_get(&self, term: &Term<P>) -> Option<&Poly<'a, P>> {
         // If term is in the ideal it will return the element that corresponds to it
         match self.original {
-            Some(I) => {
-                for (lm, poly) in izip!(self.gens.iter(), I.gens.iter()) {
+            Some(ideal) => {
+                for (lm, poly) in izip!(self.gens.iter(), ideal.gens.iter()) {
                     if lm.divides(term).unwrap() {
-                        return Some(&poly)
+                        return Some(&poly);
                     }
                 }
                 None
-            },
-            None => None
+            }
+            None => None,
         }
     }
 }
@@ -64,14 +67,13 @@ impl<'a, 'b,P: FPolyRing> MonomialIdeal<'a, 'b, P> {
 use crate::algebras::EuclideanDomain;
 
 pub fn is_groebner_basis<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> bool {
-
     let n = g.gens.len();
     for i in 0..n {
-        for j in i+1..n {
+        for j in i + 1..n {
             // Note: Only need to check that the lead term of r isn't in the initial ideal
             let r = g.gens[i].s_poly(&g.gens[j]).reduce(&g);
             if !r.is_zero() {
-                return false
+                return false;
             }
         }
     }
@@ -101,7 +103,6 @@ impl<'a, P: FPolyRing> Poly<'a, P> {
         let mut r = self.zero(); // This is a zero polynomial in the same ring as f
         let mut q = vec![self.zero(); f.len()];
 
-
         'outer: while !p.is_zero() {
             for i in 0..f.len() {
                 if let Some(quo) = p.lt().div(f[i].lt()) {
@@ -111,7 +112,7 @@ impl<'a, P: FPolyRing> Poly<'a, P> {
                 }
             }
             // Executes if no division occured
-            r = r.add(&Poly::from_terms(vec![p.pop().unwrap()], &self.ring)); 
+            r = r.add(&Poly::from_terms(vec![p.pop().unwrap()], &self.ring));
         }
         (q, r)
     }
@@ -122,8 +123,8 @@ mod tests {
     use super::*;
     use crate::algebras::real::RR;
     use crate::parse::*;
-    use crate::polyu::*;
     use crate::polym::*;
+    use crate::polyu::*;
     use generic_array::typenum::U2;
 
     #[test]
@@ -157,7 +158,6 @@ mod tests {
     //     println!("r = {:?}", r);
     //     println!("is GB? = {:?}", is_groebner_basis(&r));
     // }
-
     #[test]
     fn is_gb_test() {
         let ring = PRDomain::<RR, MultiIndex<U2>, GLex>::new(vec!['x', 'y']);

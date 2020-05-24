@@ -1,5 +1,5 @@
 use crate::algebras::*;
-use alga::general::{Additive, Identity, AbstractMagma, TwoSidedInverse, Multiplicative};
+use alga::general::{AbstractMagma, Additive, Identity, Multiplicative, TwoSidedInverse};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct ZZ(pub i32);

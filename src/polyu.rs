@@ -11,6 +11,7 @@ impl<R: ScalarRing> PolyRingUni for PRDomain<R, UniIndex, UnivarOrder> {}
 
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct UnivarOrder();
+
 impl MonomialOrdering<UniIndex> for UnivarOrder {
     fn cmp(a: &UniIndex, b: &UniIndex) -> Ordering {
         a.0.cmp(&b.0)
@@ -113,7 +114,6 @@ use std::fmt;
 // This will eventually have to be overcome some time.
 impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-
         // Because we don't want a potential "+" out the front of the first term
         if self.is_zero() {
             write!(f, "{}", <P::Coeff>::zero())

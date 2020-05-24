@@ -117,10 +117,10 @@ mod tests {
     extern crate rand;
 
     use crate::algebras::complex::CC;
-    use crate::fast_mult::*;
-    use chrono::*;
     use crate::algebras::polyring::*;
+    use crate::fast_mult::*;
     use crate::polyu::*;
+    use chrono::*;
 
     use rand::distributions::{Distribution, Uniform};
 

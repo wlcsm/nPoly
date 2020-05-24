@@ -32,7 +32,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
         }
 
         // Validates the entire thing
-        let whole_regex = Regex::new(&format!( r"^{m}(\s*(\+|-)\s*{m})*$", m = mono)).unwrap();
+        let whole_regex = Regex::new(&format!(r"^{m}(\s*(\+|-)\s*{m})*$", m = mono)).unwrap();
         // Parse each term. The "?" is in there for the first term which might not have a + or -,
         // all the other terms are guarenteed to have one because it is checked in the whole_regex
         let term_regex = Regex::new(&format!(r"(?P<sign>\+|-)?\s*{}", mono_named)).unwrap();
@@ -43,7 +43,9 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
             let mut acc = Vec::new();
             for caps in term_regex.captures_iter(s) {
                 // Extract the coefficient, at the moment, it needs a 1 there
-                let mut coeff = caps["coeff"].parse::<P::Coeff>().map_err(|_| PolyErr::ParsePolyError)?;
+                let mut coeff = caps["coeff"]
+                    .parse::<P::Coeff>()
+                    .map_err(|_| PolyErr::ParsePolyError)?;
 
                 // Take into account if it is a subtraction
                 if let Some("-") = caps.name("sign").map(|c| c.as_str()) {
@@ -74,10 +76,10 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 mod tests {
     use super::*;
     use crate::algebras::integers::ZZ;
-    use generic_array::typenum::U2;
     use crate::polym::*;
     use crate::polyu::*;
-    
+    use generic_array::typenum::U2;
+
     #[test]
     fn parsing_test() {
         // Univariate
@@ -85,7 +87,6 @@ mod tests {
         let a = Poly::from_str(&ring, "3x^2 + 5x^98 + 0x^2 + 1x^2 - 1x^2").unwrap();
         println!("{:?}", a);
         println!("{}", a);
-
 
         // Multivariate
         let ring = PRDomain::<ZZ, MultiIndex<U2>, Lex>::new(vec!['x', 'y']);
