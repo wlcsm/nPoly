@@ -60,9 +60,7 @@ impl<P: Prime> One for FF<P> {
     }
 }
 
-impl<P: Prime> Ring for FF<P> {
-    type BaseRing = FF<P>;
-
+impl<P: Prime> Group for FF<P> {
     fn add(&self, other: &Self) -> Self {
         FF::new(self.0 + other.0)
     }
@@ -72,6 +70,9 @@ impl<P: Prime> Ring for FF<P> {
     fn neg(&self) -> Self {
         FF::new(-self.0)
     }
+}
+
+impl<P: Prime> Ring for FF<P> {
     fn mul(&self, other: &Self) -> Self {
         FF::new(self.0 * other.0)
     }

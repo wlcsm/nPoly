@@ -156,21 +156,20 @@ impl<N: VarNumber> Variate for MultiIndex<N> {
         )
     }
     fn gcd(&self, other: &Self) -> Self {
-        MultiIndex::new(
-            self.indices
-                .iter()
-                .zip(other.indices.iter())
-                .map(|(a, b)| *min(a, b))
-                .collect(),
-        )
+        index_map(self, other, |a, b| min(a, b))
     }
     fn lcm(&self, other: &Self) -> Self {
-        MultiIndex::new(
-            self.indices
-                .iter()
-                .zip(other.indices.iter())
-                .map(|(a, b)| *max(a, b))
-                .collect(),
-        )
+        index_map(self, other, |a, b| max(a, b))
     }
+}
+
+fn index_map<N: VarNumber>(lhs: &MultiIndex<N>, rhs: &MultiIndex<N>, func: impl Fn(usize, usize) -> usize) -> MultiIndex<N> {
+    // Zips together two monomial indices and applies a function between them
+    MultiIndex::new(
+        lhs.indices
+        .iter()
+        .zip(rhs.indices.iter())
+        .map(|(a, b)| func(*a, *b))
+        .collect(),
+    )
 }

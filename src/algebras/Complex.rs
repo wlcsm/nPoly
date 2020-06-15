@@ -43,9 +43,7 @@ impl One for CC {
 }
 
 // <><><><><> Ring Implementation <><><><><> //
-impl Ring for CC {
-    type BaseRing = CC;
-
+impl Group for CC {
     fn add(&self, other: &Self) -> Self {
         CC(self.0 + other.0)
     }
@@ -55,6 +53,9 @@ impl Ring for CC {
     fn neg(&self) -> Self {
         CC(-self.0)
     }
+}
+
+impl Ring for CC{
     fn mul(&self, other: &Self) -> Self {
         CC(self.0 * other.0)
     }
@@ -111,25 +112,28 @@ impl ScalarRing for CC {
     }
 }
 
-impl EuclideanDomain for CC {
-    fn divides(&self, _other: &Self) -> Option<bool> {
-        if *self != CC::zero() {
-            Some(true)
-        } else {
-            None
-        }
-    }
-    fn gcd(&self, _other: &Self) -> Self {
-        if *self != CC::zero() {
-            CC::one()
-        } else {
-            CC::zero()
-        }
-    }
-    fn lcm(&self, other: &Self) -> Self {
-        CC((self.0 * other.0) / self.gcd(&other).0)
-    }
-}
+// impl EuclideanDomain for CC {
+//     fn euclid_div(&self, other: &Self) -> (Self, Self) {
+        
+//     }
+//     fn divides(&self, _other: &Self) -> Option<bool> {
+//         if *self != CC::zero() {
+//             Some(true)
+//         } else {
+//             None
+//         }
+//     }
+//     // fn gcd(&self, _other: &Self) -> Self {
+//     //     if *self != CC::zero() {
+//     //         CC::one()
+//     //     } else {
+//     //         CC::zero()
+//     //     }
+//     // }
+//     // fn lcm(&self, other: &Self) -> Self {
+//     //     CC((self.0 * other.0) / self.gcd(&other).0)
+//     // }
+// }
 
 impl Field for CC {
     fn div(&self, other: &Self) -> Option<CC> {

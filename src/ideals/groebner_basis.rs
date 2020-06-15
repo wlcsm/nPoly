@@ -1,142 +1,88 @@
 use crate::algebras::polyring::*;
+use crate::ideals::*;
 
-#[derive(Debug, Clone)]
-pub struct Ideal<'a, P: PolyRing> {
-    pub gens: Vec<Poly<'a, P>>,
-}
+// Check if an ideal is a Groebner basis.
+// Uses Buchberger's original criterion with no added optimisations
+// That is, it checks that all S-polynomials reduce to zero from division
+// by the ideal
+impl<P: FPolyRing> Ideal<P> {
+    pub fn is_groebner_basis(&self) -> bool {
+        let n = self.gens.len();
+        (0..n)
+            .zip(0..n)
+            .filter(|(i, j)| i >= j)
+            .map(|(i, j)| s_poly(&self.gens[i], &self.gens[j]).reduce(&self))
+            .all(|x| !x.unwrap().is_zero())
+    }
 
-impl<'a, P: PolyRing> Ideal<'a, P> {
-    pub fn new(gens: Vec<Poly<'a, P>>) -> Self {
-        Ideal { 
-            gens: gens.into_iter().filter(|t| !t.is_zero()).collect()
+    /// Standard implementation of Buchberger's Algorithm
+    pub fn bb_algorithm(&self) -> Self {
+        let mut gb = self.clone();
+        let mut n = gb.gens.len();
+        let mut pairs = unord_pairs_int(n);
+
+        // Iterates through all the pairs until there are no more pairs to check
+        while !pairs.is_empty() {
+            let mut new_pairs = Vec::new();
+
+            for (i, j) in pairs {
+                let r = s_poly(&gb.gens[i], &gb.gens[j]).reduce(&gb).unwrap();
+                if !r.is_zero() {
+                    // Add the remainder to the ideal and update the pairs that we
+                    // need to check
+                    gb.add(r);
+                    n += 1;
+                    new_pairs.append(&mut (0..n - 1).map(|k| (k, n)).collect());
+                }
+            }
+            pairs = new_pairs;
         }
-    }
-    pub fn add(&mut self, item: Poly<'a, P>) {
-        if !self.gens.contains(&item) && !item.is_zero() {
-            self.gens.push(item)
-        }
-    }
-    pub fn num_gens(&self) -> usize {
-        self.gens.len()
-    }
-}
-
-use std::fmt;
-
-impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ideal (\n {} )", 
-            self.gens.iter()
-                .map(|p| format!("{}", p))
-                .collect::<Vec<String>>()
-                .join("\n")
-        )
-    }
-}
-
-
-// Want to take ownership so that the ideal doesn't change.
-// If you want the ideal again then you need to get it from the destructor
-#[derive(Debug, Clone)]
-pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
-    gens: Vec<Term<P>>,
-    original: Option<&'b Ideal<'a, P>>,
-}
-
-use crate::algebras::*;
-
-impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
-    pub fn new(gens: Vec<Term<P>>) -> Self {
-        // Take out any zeros
-        MonomialIdeal {
-            gens: gens.into_iter().filter(|t| *t != Term::zero()).collect(),
-            original: None,
-        }
-    }
-    pub fn from(poly_ideal: &'b Ideal<'a, P>) -> Self {
-        MonomialIdeal {
-            gens: poly_ideal.gens.iter().map(|a| a.lt().clone()).collect(),
-            original: Some(poly_ideal),
-        }
-    }
-    pub fn add(&mut self, item: Term<P>) {
-        if !self.is_in(&item) && item != Term::zero() {
-            self.gens.push(item)
-        }
+        gb
     }
 
-    pub fn is_in(&self, term: &Term<P>) -> bool {
-        self.gens.iter().any(|t| t.divides(term).unwrap())
-    }
+    /// Implementation of the Improved Buchberger's algorithm found at the end of
+    /// "Ideals, Varieties, and Algorithms" by Cox, Little, and O'Shea 4th edition.
+    pub fn bb_algorithm_plus(&self) -> Self {
+        let mut gb = self.clone();
+        let mut n = gb.gens.len();
+        let mut unchecked_pairs = unord_pairs_int(n);
 
-    pub fn get_poly(&self, term: &Term<P>) -> Option<&Poly<'a, P>> {
-        // If term is in the ideal it will return the element that corresponds to it
-        match self.original {
-            Some(ideal) => {
-                for (lm, poly) in izip!(self.gens.iter(), ideal.gens.iter()) {
-                    if lm.divides(term).unwrap() {
-                        return Some(&poly);
+        // Iterates through all the pairs until there are no more pairs to check
+        while !unchecked_pairs.is_empty() {
+            let mut new_pairs = Vec::new();
+
+            for (i, j) in unchecked_pairs {
+                if gb.gens[i].lt().gcd(&gb.gens[j].lt()) != Term::one() {
+                    let r = s_poly(&gb.gens[i], &gb.gens[j]).reduce(&gb).unwrap();
+                    if !r.is_zero() {
+                        // Add the remainder to the ideal and update the pairs that we
+                        // need to check
+                        gb.add(r);
+                        n += 1;
+                        new_pairs.append(&mut (0..n - 1).map(|k| (k, n)).collect());
                     }
                 }
-                None
             }
-            None => None,
+            unchecked_pairs = new_pairs;
         }
+        gb
     }
 }
 
-use crate::algebras::EuclideanDomain;
-
-pub fn is_groebner_basis<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> bool {
-    let n = g.gens.len();
-    for i in 0..n {
-        for j in i + 1..n {
-            // Note: Only need to check that the lead term of r isn't in the initial ideal
-            let r = g.gens[i].s_poly(&g.gens[j]).reduce(&g);
-            if !r.is_zero() {
-                return false;
-            }
-        }
-    }
-    true
+/// Gets all the unordered pairs between zero and the input n.
+/// Not the most efficient implementation but the simplest
+fn unord_pairs_int(n: usize) -> Vec<(usize, usize)> {
+    (0..n).zip(0..n).filter(|(i, j)| i >= j).collect()
 }
 
-impl<'a, P: FPolyRing> Poly<'a, P> {
-    fn pop(&mut self) -> Option<Term<P>> {
-        self.terms.pop()
-    }
-    fn s_poly(&self, other: &Self) -> Self {
-        let lcm = self.lt().lcm(&other.lt());
-        let a_newlead = lcm.div(self.lt()).unwrap();
-        let b_newlead = lcm.div(other.lt()).unwrap();
-        self.term_scale(&a_newlead)
-            .sub(&other.term_scale(&b_newlead))
-    }
-}
+/// Calculates the S-polynomial of the pair
+fn s_poly<P: FPolyRing>(lhs: &Poly<P>, rhs: &Poly<P>) -> Poly<P> {
 
-impl<'a, P: FPolyRing> Poly<'a, P> {
-    fn reduce(&self, g: &Ideal<'a, P>) -> Self {
-        self.divpolys(&g.gens).1
-    }
+    let lcm = lhs.lt().lcm(&rhs.lt());
+    let a_newlead = lcm.div(lhs.lt()).unwrap();
+    let b_newlead = lcm.div(rhs.lt()).unwrap();
 
-    pub fn divpolys(&self, f: &Vec<Self>) -> (Vec<Self>, Self) {
-        let mut p = self.clone();
-        let mut r = self.zero(); // This is a zero polynomial in the same ring as f
-        let mut q = vec![self.zero(); f.len()];
-
-        'outer: while !p.is_zero() {
-            for i in 0..f.len() {
-                if let Some(quo) = p.lt().div(f[i].lt()) {
-                    p = p.sub(&f[i].term_scale(&quo));
-                    q[i] = q[i].add(&Poly::from_terms(vec![quo], &q[i].ring));
-                    continue 'outer;
-                }
-            }
-            // Executes if no division occured
-            r = r.add(&Poly::from_terms(vec![p.pop().unwrap()], &self.ring));
-        }
-        (q, r)
-    }
+    lhs.term_scale(&a_newlead).sub(&rhs.term_scale(&b_newlead))
 }
 
 #[cfg(test)]
@@ -155,7 +101,7 @@ mod tests {
         let ring = PRDomain::<RR, UniIndex, UnivarOrder>::new(vec!['x']);
         let a = Poly::from_str(&ring, "3.0x^2 + 5.0x^98").unwrap();
         let b = Poly::from_str(&ring, "5.0x^6").unwrap();
-        let (q, r) = a.divpolys(&vec![b]);
+        let (q, r) = a.euclid_div(&b).unwrap();
         println!("q = {:?}", q);
         println!("r = {}", r);
 
@@ -165,31 +111,32 @@ mod tests {
         let b = Poly::from_str(&ring, "5.0x^6").unwrap();
         println!("a = {}", a);
         println!("b = {}", b);
-        let (q, r) = a.divpolys(&vec![b]);
+        let (q, r) = a.euclid_div(&b).unwrap();
         println!("q = {:?}", q);
         println!("r = {}", r);
     }
 
     #[test]
-    // fn bb_alg_test() {
-    //     let ring = PRDomain::<RR, MultiIndex<U2>, GLex>::new(vec!['x', 'y']);
-    //     let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
-    //     let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
-    //     let r = bb_algorithm(&Ideal::new(vec![a, b]));
-    //     println!("r = {:?}", r);
-    //     println!("is GB? = {:?}", is_groebner_basis(&r));
-    // }
+    fn bb_alg_test() {
+        let ring = PRDomain::<RR, MultiIndex<U2>, GLex>::new(vec!['x', 'y']);
+        let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
+        let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
+        let r = bb_algorithm(&Ideal::new(vec![a, b]));
+        println!("r = {:?}", r);
+        println!("is GB? = {:?}", is_groebner_basis(&r));
+    }
+
     #[test]
     fn is_gb_test() {
         let ring = PRDomain::<RR, MultiIndex<U2>, GLex>::new(vec!['x', 'y']);
         let x = Poly::from_str(&ring, "1.0x^1").unwrap();
         let y = Poly::from_str(&ring, "1.0y^1").unwrap();
         let x_y_ideal = Ideal::new(vec![x, y]);
-        assert!(is_groebner_basis(&x_y_ideal));
+        assert!(x_y_ideal.is_groebner_basis());
 
         let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
         let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
         let not_gb = Ideal::new(vec![a, b]);
-        assert!(!is_groebner_basis(&not_gb));
+        assert!(!not_gb.is_groebner_basis());
     }
 }

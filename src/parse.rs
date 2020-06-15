@@ -13,20 +13,20 @@ use regex::Regex;
 // Made my own one because I currently can't use the std::str::FromStr because I need to
 // specify what the ring of the polynomial should be beforehand. Since I cannot include the indeterminate's
 // symbols at the moment, I can't infer the indeterminates symbols from the type signature
-pub trait MyFromStr<'a, P: PolyRing>: Sized {
+pub trait MyFromStr<P: PolyRing>: Sized {
     type Err;
-    fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err>;
+    fn from_str(ring: P, s: &str) -> Result<Self, Self::Err>;
 }
 
-impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
+impl<P: PolyRing> MyFromStr<P> for Poly<P> {
     type Err = PolyErr;
 
-    fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err> {
+    fn from_str(ring:  P, s: &str) -> Result<Self, Self::Err> {
         // Build the named and unnamed regexes
         let mut mono = format!("{}", P::Coeff::REGEX);
         let mut mono_named = format!("(?P<coeff>{})", P::Coeff::REGEX);
 
-        for s in ring.symb() {
+        for s in ring.symb().unwrap() {
             mono.push_str(&format!(r"({var}\^\d*)?", var = s));
             mono_named.push_str(&format!(r"(?:{var}\^(?P<{var}>\d*))?", var = s));
         }
@@ -34,7 +34,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
         // Validates the entire thing
         let whole_regex = Regex::new(&format!(r"^{m}(\s*(\+|-)\s*{m})*$", m = mono)).unwrap();
         // Parse each term. The "?" is in there for the first term which might not have a + or -,
-        // all the other terms are guarenteed to have one because it is checked in the whole_regex
+        // all the other terms are guaranteed to have one because it is checked in the whole_regex
         let term_regex = Regex::new(&format!(r"(?P<sign>\+|-)?\s*{}", mono_named)).unwrap();
 
         if !whole_regex.is_match(s) {
@@ -54,7 +54,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 
                 // Extract the indices of the interminates in the term
                 let mut degrees = P::Var::zero();
-                for (i, symb) in ring.symb().iter().enumerate() {
+                for (i, symb) in ring.symb().unwrap().iter().enumerate() {
                     if let Some(n) = caps.name(symb.to_string().as_str()) {
                         degrees.set(
                             i,
@@ -67,7 +67,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 
                 acc.push(Term::new(coeff, degrees))
             }
-            Ok(Poly::<'a, P>::from_terms(acc, ring))
+            Ok(Poly::<P>::from_terms(acc, ring))
         }
     }
 }

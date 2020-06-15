@@ -1,6 +1,6 @@
 use crate::algebras::polyring::*;
 use crate::algebras::*;
-use crate::ideals::groebner_basis::*;
+use crate::ideals::*;
 
 fn vec_poly_str<'a, P: PolyRing>(poly: &Vec<Poly<'a, P>>) -> String {
     poly.iter()
@@ -13,15 +13,15 @@ fn vec_poly_str<'a, P: PolyRing>(poly: &Vec<Poly<'a, P>>) -> String {
 pub fn f4<'a, P: FPolyRing>(f_gens: Vec<Poly<'a, P>>) -> Ideal<'a, P> {
     let mut g_basis = Ideal::new(f_gens.clone());
     let mut t = f_gens.len();
-    println!("f+gens = {}", vec_poly_str(&f_gens));
-    println!("t = {}", t);
+    // println!("f+gens = {}", vec_poly_str(&f_gens));
+    // println!("t = {}", t);
     let mut subsets: Vec<(usize, usize)> = iproduct!(0..t, 0..t).filter(|(a, b)| a != b).collect();
 
     while !subsets.is_empty() {
         let selection: Vec<(usize, usize)> = choose_subset(&mut subsets);
 
-        println!("selection = {:?}", selection);
-        println!("g_basis = \n{}", g_basis);
+        // println!("selection = {:?}", selection);
+        // println!("g_basis = \n{}", g_basis);
         let mut l_mat: Vec<Poly<'a, P>> = selection
             .into_iter()
             .map(|(i, j)| left_hand_s_poly(&g_basis.gens[i], &g_basis.gens[j]))
@@ -84,8 +84,6 @@ pub fn row_reduce<'a, P: FPolyRing>(mat: &mut Vec<Poly<'a, P>>) {
         // Preserve the order
         mat[i..j].sort_by(|a, b| <P::Ord>::cmp(&b.lt().deg, &a.lt().deg));
 
-        println!("Matrix so far = [\n{}\n]", vec_poly_str(mat));
-
         // Goes back up the matrix in order to put it into reduces row echelon
         for j in (0..i).rev() {
             if let Some(c) = mat[j].has(&lm) {
@@ -96,7 +94,6 @@ pub fn row_reduce<'a, P: FPolyRing>(mat: &mut Vec<Poly<'a, P>>) {
                 mat[j] = mat[j].sub(&mat[i]);
             }
         }
-        println!("Matrix after RREF = [\n{}\n]", vec_poly_str(mat));
     }
 }
 
@@ -118,12 +115,16 @@ pub fn compute_m<'a, P: FPolyRing>(l_mat: &mut Vec<Poly<'a, P>>, g: &Ideal<'a, P
 
     let mut seen_monomials: BTreeMap<Term<P>, Vec<usize>> = BTreeMap::new();
 
+    for (i, t) in l_mat.iter().enumerate() {
+        seen_monomials.insert(t.lt(), vec![i]);
+    }
     // Iterates through the monomials of the polynomials in the matrix and adds the extra
     // scaled basis elements if necessary
     while i < l_mat.len() {
         let mut aux = Vec::new();
 
         // Go through the terms and add any that aren't already in there
+        // We can skip the first element since it is the trivial case
         for term in l_mat[i].terms.iter() {
             // If term is in G_init, then give back the scaled f
             if let Some(poly) = g_init.get_poly(&term) {
@@ -161,6 +162,7 @@ mod tests {
 
     #[test]
     fn f4_test() {
+        println!("Begin ===============");
         let ring = PRDomain::<RR, MultiIndex<U3>, GLex>::new(vec!['x', 'y', 'z']);
         let f_vec = vec![
                 Poly::from_str(&ring, "1.0x^2 + 1.0x^1y^1 - 1.0").unwrap(),

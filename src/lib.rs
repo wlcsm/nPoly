@@ -1,9 +1,17 @@
 #![feature(associated_type_bounds)]
+#![feature(iterator_fold_self)]
+
+// The associated type bound was used in the construction of the FPolyRing trait to 
+// make it essentially a subclass of it
+//
+// The iterator_fold_self was used in the standard polynomial multiplication algorithm
+// in which I used a fold_first function (this can probably be worked around)
 /// The polynomial crate
 extern crate generic_array;
 #[macro_use]
 extern crate itertools;
 extern crate nalgebra;
+extern crate num;
 
 pub mod algebras;
 pub mod error;
@@ -21,6 +29,7 @@ mod tests {
 
     use crate::algebras::integers::ZZ;
     use crate::algebras::polyring::*;
+    use crate::algebras::*;
 
     #[test]
     fn basics() {

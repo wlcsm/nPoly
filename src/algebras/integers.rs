@@ -1,5 +1,7 @@
 use crate::algebras::*;
 use alga::general::{AbstractMagma, Additive, Identity, Multiplicative, TwoSidedInverse};
+// This is necessary to use the "num" crates gcd and lcm functions
+use num::Integer;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct ZZ(pub i32);
@@ -39,9 +41,7 @@ impl Zero for ZZ {
     }
 }
 
-impl Ring for ZZ {
-    type BaseRing = ZZ;
-
+impl Group for ZZ {
     fn add(&self, other: &Self) -> Self {
         ZZ(self.0 + other.0)
     }
@@ -51,6 +51,9 @@ impl Ring for ZZ {
     fn neg(&self) -> Self {
         ZZ(-self.0)
     }
+}
+
+impl Ring for ZZ {
     fn mul(&self, other: &Self) -> Self {
         ZZ(self.0 * other.0)
     }
@@ -90,20 +93,28 @@ impl std::str::FromStr for ZZ {
 }
 
 impl EuclideanDomain for ZZ {
+    // The GCD and LCM functions use the "num" crate's gcd and lcm
+    // implementations
+    fn gcd(&self, other: &Self) -> Self {
+        ZZ(self.0.gcd(&other.0))
+    }
+    fn lcm(&self, other: &Self) -> Self {
+        ZZ(self.0.lcm(&other.0))
+    }
+    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
+        if other.is_zero() {
+            None
+        } else {
+            Some((
+                ZZ(self.0.div_euclid(other.0)),
+                ZZ(self.0.rem_euclid(other.0)),
+            ))
+        }
+    }
     fn divides(&self, other: &Self) -> Option<bool> {
         other
             .0
             .checked_rem_euclid(self.0)
             .and_then(|r| Some(r == 0))
-    }
-    fn gcd(&self, other: &Self) -> Self {
-        if self.0 == 0 {
-            *other
-        } else {
-            ZZ(other.0 % self.0).gcd(&self)
-        }
-    }
-    fn lcm(&self, other: &Self) -> Self {
-        ZZ((self.0 * other.0) / self.gcd(&other).0)
     }
 }

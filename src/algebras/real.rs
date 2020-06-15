@@ -31,9 +31,7 @@ impl One for RR {
 }
 
 // <><><><><> Ring Implementation <><><><><> //
-impl Ring for RR {
-    type BaseRing = RR;
-
+impl Group for RR {
     fn add(&self, other: &Self) -> Self {
         RR(self.0 + other.0)
     }
@@ -43,6 +41,8 @@ impl Ring for RR {
     fn neg(&self) -> Self {
         RR(-self.0)
     }
+}
+impl Ring for RR {
     fn mul(&self, other: &Self) -> Self {
         RR(self.0 * other.0)
     }
@@ -79,25 +79,25 @@ impl ScalarRing for RR {
     }
 }
 
-impl EuclideanDomain for RR {
-    fn divides(&self, _other: &Self) -> Option<bool> {
-        if *self != RR::zero() {
-            Some(true)
-        } else {
-            None
-        }
-    }
-    fn gcd(&self, _other: &Self) -> Self {
-        if *self != RR::zero() {
-            RR::one()
-        } else {
-            RR::zero()
-        }
-    }
-    fn lcm(&self, other: &Self) -> Self {
-        RR((self.0 * other.0) / self.gcd(&other).0)
-    }
-}
+// impl EuclideanDomain for RR {
+//     fn divides(&self, _other: &Self) -> Option<bool> {
+//         if *self != RR::zero() {
+//             Some(true)
+//         } else {
+//             None
+//         }
+//     }
+//     // fn gcd(&self, _other: &Self) -> Self {
+//     //     if *self != RR::zero() {
+//     //         RR::one()
+//     //     } else {
+//     //         RR::zero()
+//     //     }
+//     // }
+//     // fn lcm(&self, other: &Self) -> Self {
+//     //     RR((self.0 * other.0) / self.gcd(&other).0)
+//     // }
+// }
 
 impl Field for RR {
     fn div(&self, other: &Self) -> Option<RR> {

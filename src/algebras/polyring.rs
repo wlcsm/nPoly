@@ -5,11 +5,16 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 // <><><><><><><><><><> Poly Ring Domain <><><><><><><><><><> //
+// The const_domain function is used in the One and Zero traits,
+// this is because the one() and zero() function in these traits can't
+// take arguments hence we can't insert the required metadata i.e.
+// PRDomain struct into it.
 pub trait PolyRing: Eq + PartialEq + Clone + std::fmt::Debug {
     type Coeff: ScalarRing;
     type Var: Variate;
     type Ord: MonomialOrdering<Self::Var>;
-    fn symb(&self) -> Vec<char>;
+    fn symb(&self) -> Option<Vec<char>>;
+    fn const_domain() -> Self;
 }
 pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug {}
 
@@ -29,10 +34,15 @@ impl VarNumber for U3 {}
 // type of the indices) but here it needs to store a char. Until generic arrays remove this
 // requirement I will use a Vector and contracts to ensure the number of symbols is equal to the
 // number of indices.
+
+// To combat the problem with the One and Zero traits at the moment, I have decided to make the
+// vars struct and Option type, None indicating that it is part of the const_ring function, and
+// Some otherwise. I could have just made the vector empty but that would mess up my later plans to
+// make the "vars" struct a GenericArray with length equal to the number of indeterminates
 use std::fmt;
 #[derive(Eq, PartialEq, Clone)]
 pub struct PRDomain<R: ScalarRing, U: Variate, M: MonomialOrdering<U>> {
-    pub(crate) vars: Vec<char>,
+    pub(crate) vars: Option<Vec<char>>,
     ring_parameters: PhantomData<(R, U, M)>,
 }
 
@@ -64,8 +74,14 @@ where
     type Coeff = R;
     type Var = U;
     type Ord = M;
-    fn symb(&self) -> Vec<char> {
+    fn symb(&self) -> Option<Vec<char>> {
         self.vars.clone()
+    }
+    fn const_domain() -> Self {
+        PRDomain {
+            vars: None,
+            ring_parameters: PhantomData,
+        }
     }
 }
 
@@ -82,7 +98,16 @@ where
             panic!("Number of variable symbols supplied to create ring is not the same as its type definition");
         }
         PRDomain {
-            vars,
+            vars: Some(vars),
+            ring_parameters: PhantomData,
+        }
+    }
+
+    // Has no indeterminates. This is the default ring assigned when implementing
+    // the "One" and "Zero" traits for polynomials.
+    pub fn constant_ring() -> Self {
+        PRDomain {
+            vars: None,
             ring_parameters: PhantomData,
         }
     }
@@ -92,7 +117,7 @@ where
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Poly<'a, P: PolyRing> {
     pub(crate) terms: Vec<Term<P>>,
-    pub(crate) ring: &'a P,
+    pub(crate) ring: Option<&'a P>,
 }
 
 impl<'a, P: PolyRing> Poly<'a, P> {
@@ -123,10 +148,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
 
     pub fn from_terms_unchecked(terms: Vec<Term<P>>, ring: &'a P) -> Poly<'a, P> {
-        Poly {
-            terms,
-            ring,
-        }
+        Poly { terms, ring: Some(ring) }
     }
 }
 #[cfg(test)]
@@ -178,6 +200,7 @@ impl<P: PolyRing> Term<P> {
         <P::Ord>::cmp(&self.deg, &other.deg)
     }
 }
+
 impl<P: PolyRing> Zero for Term<P> {
     fn zero() -> Self {
         Term::new(<P::Coeff>::zero(), <P::Var>::zero())
@@ -189,8 +212,7 @@ impl<P: PolyRing> One for Term<P> {
     }
 }
 
-impl<P: PolyRing> Ring for Term<P> {
-    type BaseRing = P::Coeff;
+impl<P: PolyRing> Group for Term<P> {
     // Group operations
     fn add(&self, _other: &Self) -> Self {
         unimplemented!()
@@ -201,26 +223,55 @@ impl<P: PolyRing> Ring for Term<P> {
     fn neg(&self) -> Self {
         Term::new(self.coeff.neg(), self.deg.clone())
     }
+}
+
+impl<P: PolyRing> Ring for Term<P> {
     // Ring operations
     fn mul(&self, other: &Self) -> Self {
         Term::new(self.coeff.mul(&other.coeff), self.deg.add(&other.deg))
     }
 }
 
-impl<E, P> EuclideanDomain for Term<P>
-where
-    E: ScalarRing + EuclideanDomain,
-    P: PolyRing<Coeff = E>,
-{
-    fn gcd(&self, other: &Self) -> Self {
+// impl<P> EuclideanDomain for Term<P>
+// where
+//     P: FPolyRing,
+// {
+
+//     fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
+//        match (
+//             self.coeff.div(&other.coeff),
+//             self.deg.divides(&other.deg),
+//         ) {
+//            (Some(c), Some(t)) if t => Term::new(c, self.deg.sub(other.deg)),
+//            (_, _) => None
+//         }
+//     }
+//     fn divides(&self, other: &Self) -> Option<bool> {
+//         // Checks if a term is divisible by another term. For this to occur both the monomial and the coefficients,
+//         // need to divide each other. This returns a zero if the coefficient of the divisor is zero.
+//         match (
+//             self.coeff.divides(&other.coeff),
+//             self.deg.divides(&other.deg),
+//         ) {
+//             (Some(a), Some(b)) => Some(a && b),
+//             // Note that a index dividing an index will always return a Some() value
+//             (None, _) => None,
+//             _ => Some(false),
+//         }
+//     }
+// }
+
+// This is an annoying point because these functions should be the ones implemented in the
+// Euclidean domain but Term isn't a ring so it doesn't work
+impl<P: FPolyRing> Term<P> {
+    pub fn gcd(&self, other: &Self) -> Self {
         Term::new(self.coeff.gcd(&other.coeff), self.deg.gcd(&other.deg))
     }
-    fn lcm(&self, other: &Self) -> Self {
+    pub fn lcm(&self, other: &Self) -> Self {
         Term::new(self.coeff.lcm(&other.coeff), self.deg.lcm(&other.deg))
     }
-
-    fn divides(&self, other: &Self) -> Option<bool> {
-        // Checks if a term is divisible by another term. For this to occur both the monomial and the coefficients, 
+    pub fn divides(&self, other: &Self) -> Option<bool> {
+        // Checks if a term is divisible by another term. For this to occur both the monomial and the coefficients,
         // need to divide each other. This returns a zero if the coefficient of the divisor is zero.
         match (
             self.coeff.divides(&other.coeff),
@@ -238,7 +289,7 @@ impl<P: PolyRing> Term<P> {
     pub fn to_str(&self, ring: &P) -> String {
         let mut term = self.coeff.to_string();
 
-        for (i, symb) in ring.symb().iter().enumerate() {
+        for (i, symb) in ring.symb().unwrap().iter().enumerate() {
             match self.deg.get(i).unwrap() {
                 0 => {}
                 1 => term.push(*symb),
@@ -278,9 +329,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     pub fn lt(&self) -> Term<P> {
         match self.num_terms() {
             0 => Term::zero(),
-            n => {
-                self.get(n - 1).unwrap().clone()
-            }
+            n => self.get(n - 1).unwrap().clone(),
         }
     }
 
@@ -333,7 +382,60 @@ pub trait Variate: Zero + Clone + Eq + Debug {
     fn divides(&self, other: &Self) -> Option<bool>;
 }
 
-// Basic Arithmetic operations for polynomial
+impl<'a, P: PolyRing> Group for Poly<'a, P> {
+    fn add(&self, other: &Self) -> Self {
+        Poly::elementwise_add(&self, other)
+    }
+
+    // TODO the negation here is VERY expensive because it is cloning everything
+    // The best solution I can think of is to use smart pointers, and hold things
+    // like the lead scalar in the smart pointer
+    fn sub(&self, other: &Self) -> Self {
+        Poly::elementwise_add(self, &other.neg())
+    }
+
+    fn neg(&self) -> Self {
+        self.elementwise_map(|t| t.neg())
+    }
+}
+
+// ------------ Note ----------- //
+// If you want to actually implement the zero and one functions, then
+// then the only clean solution I can think of is to redefine the Zero
+// and One trait to optionally take an argument, this can by done via
+// associated types, the associated types of all the other rings should
+// be the unit () since we don't need to pass anything. The associated
+// type for this should be the ring we want to pass in "P".
+// At the moment I have just used the const_domain function to insert a
+// dummy domain.
+impl<'a, P: PolyRing> Zero for Poly<'a, P> {
+    fn zero() -> Self {
+        Poly::from_terms_unchecked(vec![], &P::const_domain())
+    }
+    fn is_zero(&self) -> bool {
+        // TODO actually should simplify the terms before checking that it is empty. I'm not
+        // sure if I broke the invariant that the polynomials always need to be fully reduced
+        // If I haven't which I hope I haven't then it should be fine
+        self.terms.is_empty()
+    }
+}
+
+impl<'a, P: PolyRing> One for Poly<'a, P> {
+    fn one() -> Self {
+        Poly::from_terms_unchecked(vec![Term::one()], &P::const_domain())
+    }
+}
+
+impl<'a, P: PolyRing> Ring for Poly<'a, P> {
+    fn mul(&self, other: &Self) -> Self {
+        self.terms
+            .iter()
+            .map(|t| other.term_scale(t))
+            .fold_first(|a, b| a.add(&b))
+            .unwrap()
+    }
+}
+
 impl<'a, P: PolyRing> Poly<'a, P> {
     pub fn term_scale(&self, term: &Term<P>) -> Poly<'a, P> {
         let new_terms = self
@@ -343,41 +445,10 @@ impl<'a, P: PolyRing> Poly<'a, P> {
             .collect();
         Poly::from_terms_unchecked(new_terms, self.ring)
     }
-    pub fn is_zero(&self) -> bool {
-        self.num_terms() == 0
-            || (self.num_terms() == 1 && self.get(0).unwrap().coeff == <P::Coeff>::zero())
-    }
-
-    pub fn add(&self, other: &Self) -> Self {
-        Poly::elementwise_add(&self, other)
-    }
-
-    // TODO the negation here is VERY expensive because it is cloning everything
-    // The best solution I can think of is to use smart pointers, and hold things
-    // like the lead scalar in the smart pointer
-    pub fn sub(&self, other: &Self) -> Self {
-        Poly::elementwise_add(self, &other.neg())
-    }
-
-    pub fn neg(&self) -> Self {
-        self.elementwise_map(|t| t.neg())
-    }
-
-    pub fn zero(&self) -> Self {
-        Poly::from_terms_unchecked(vec![], self.ring)
-    }
-
-    pub fn is_one(&self) -> bool {
-        self.num_terms() == 1 && self.get(0).unwrap().coeff == <P::Coeff>::one()
-    }
-
-    pub fn one(&self) -> Self {
-        Poly::from_terms_unchecked(vec![Term::one()], self.ring)
-    }
 
     pub fn scale(&self, scalar: P::Coeff) -> Self {
         if scalar == <P::Coeff>::zero() {
-            Poly::zero(&self)
+            Poly::zero()
         } else {
             self.elementwise_map(|t| t.scale(&scalar))
         }
@@ -385,14 +456,15 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 
     pub fn scale_ass(&mut self, scalar: P::Coeff) {
         if scalar == <P::Coeff>::zero() {
-            self.clone_from(&Poly::zero(&self));
+            self.clone_from(&Poly::zero());
         } else {
             self.elementwise_map_mut(|t| t.coeff.mul_ass(&scalar))
         }
     }
 
     pub fn elementwise_map(&self, map: impl Fn(&Term<P>) -> Term<P>) -> Self {
-        Poly::from_terms(self.terms.iter().map(map).collect(), self.ring)
+        // TODO currently panics when it is called on a polynomial with None for the ring
+        Poly::from_terms(self.terms.iter().map(map).collect(), self.ring.unwrap())
     }
 
     pub fn elementwise_map_mut(&mut self, map: impl Fn(&mut Term<P>)) {
@@ -400,9 +472,19 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
 
     pub fn elementwise_add(polya: &Self, polyb: &Self) -> Self {
-        if polya.ring != polyb.ring {
-            panic!("Try to add two poly with different rings I don't know how to do that yet")
-        }
+        //
+        // Determines the ring that the resulting polynomial will be in
+        let ring = match (polya.ring, polyb.ring) {
+            (None,    None)    => None,
+            (Some(a), None)    => Some(a),
+            (None,    Some(b)) => Some(b),
+            (Some(a), Some(b)) => 
+                if polya.ring != polyb.ring {
+                    panic!("Try to add two poly with different rings I don't know how to do that yet")
+                } else {
+                    Some(a) // Just gives is polya's ring if they are the same
+                },
+        };
 
         // Knowing which polynomial is bigger is advantages here
         let (smol, bigg) = match polya.num_terms().cmp(&polyb.num_terms()) {
@@ -449,6 +531,43 @@ impl<'a, P: PolyRing> Poly<'a, P> {
             res.push(bigg.get_uc(k).clone())
         }
 
-        Poly::from_terms_unchecked(res, polya.ring)
+        Poly::from_terms_unchecked(res, ring)
+    }
+}
+
+impl<'a, P: FPolyRing> EuclideanDomain for Poly<'a, P> {
+    fn gcd(&self, _other: &Self) -> Self {
+        unimplemented!()
+    }
+    fn lcm(&self, _other: &Self) -> Self {
+        unimplemented!()
+    }
+    // Implemented as a special case of the multi-divisor algorithm
+    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
+        let (mut q, r) = self.euclid_div_multi(&vec![other])?;
+        Some((q.swap_remove(0), r))
+    }
+
+    // A more efficient euclidean division algorithm
+    fn euclid_div_multi(&self, divisors: &Vec<&Self>) -> Option<(Vec<Self>, Self)> {
+        if divisors.iter().any(|x| x.is_zero()) {
+            return None;
+        }
+        let mut p = self.clone();
+        let mut r = <Self>::zero(); // This is a zero polynomial in the same ring as f
+        let mut q = vec![<Self>::zero(); divisors.len()];
+
+        'outer: while !p.is_zero() {
+            for i in 0..divisors.len() {
+                if let Some(quo) = p.lt().div(divisors[i].lt()) {
+                    p = p.sub(&divisors[i].term_scale(&quo));
+                    q[i] = q[i].add(&Poly::from_terms(vec![quo], &q[i].ring));
+                    continue 'outer;
+                }
+            }
+            // Executes if no division occurred
+            r = r.add(&Poly::from_terms(vec![p.terms.pop().unwrap()], &self.ring));
+        }
+        Some((q, r))
     }
 }

@@ -3,7 +3,7 @@ use crate::algebras::*;
 use std::cmp::Ordering;
 
 // Shorthand
-pub type PolyU<'a, R> = Poly<'a, PRDomain<R, UniIndex, UnivarOrder>>;
+pub type PolyU<'a, R> = Poly<PRDomain<R, UniIndex, UnivarOrder>>;
 
 pub trait PolyRingUni: PolyRing<Var = UniIndex, Ord = UnivarOrder> {}
 
@@ -69,8 +69,8 @@ impl Variate for UniIndex {
 }
 
 // <><><><><><><><> Constructors <><><><><><><><> //
-impl<'a, P: PolyRingUni> Poly<'a, P> {
-    pub(crate) fn from_coeff(ring: &'a P, coeffs: Vec<P::Coeff>) -> Poly<'a, P> {
+impl<P: PolyRingUni> Poly<P> {
+    pub(crate) fn from_coeff(ring: P, coeffs: Vec<P::Coeff>) -> Poly<P> {
         // Automatically compress the terms argument
         let terms = coeffs
             .into_iter()
@@ -112,7 +112,7 @@ use std::fmt;
 // Problem is that it's hard to put an ordering on the coefficients because in finite fields
 // thats quite ambiguious. I need it in the "if x < 0" line
 // This will eventually have to be overcome some time.
-impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
+impl<P: PolyRing> fmt::Display for Poly<P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Because we don't want a potential "+" out the front of the first term
         if self.is_zero() {
