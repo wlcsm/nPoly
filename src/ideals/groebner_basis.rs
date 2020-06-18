@@ -17,6 +17,24 @@ pub fn is_groebner_basis<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> bool {
     true
 }
 
+/// Performs the standard Buchberger's algorithm
+pub fn bb_algorithm<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> Vec<Poly<'a, P>> {
+    let n = g.gens.len();
+    let f = g.clone();
+    let unchecked_pairs = (0..n).zip(0..n).filter(|i, j| i >= j).collect();
+
+    while !unchecked_pairs.is_empty() {
+
+        for (i, j) in unchecked_pairs {
+            // Note: Only need to check that the lead term of r isn't in the initial ideal
+            let r = g.gens[i].s_poly(&g.gens[j]).reduce(&g);
+            if !r.is_zero() {
+                return false;
+            }
+        }
+    }
+}
+
 impl<'a, P: FPolyRing> Poly<'a, P> {
     fn pop(&mut self) -> Option<Term<P>> {
         self.terms.pop()

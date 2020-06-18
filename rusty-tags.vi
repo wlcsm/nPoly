@@ -4510,6 +4510,7 @@ basics	/Users/williamcashman/Honours/Program/n_poly/src/algebras/finite_field.rs
 basics	/Users/williamcashman/Honours/Program/n_poly/src/lib.rs	/^    fn basics() {$/;"	f	module:tests
 batching	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/adaptors/mod.rs	/^pub fn batching<I, F>(iter: I, f: F) -> Batching<I, F> {$/;"	f
 batching	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/lib.rs	/^    fn batching<B, F>(self, f: F) -> Batching<Self, F>$/;"	P	interface:Itertools
+bb_algorithm	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^pub fn bb_algorithm<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> Vec<Poly<'a, P>> {$/;"	f
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:Range
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:RangeFrom
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:RangeFull
