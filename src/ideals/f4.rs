@@ -1,6 +1,6 @@
 use crate::algebras::polyring::*;
 use crate::algebras::*;
-use crate::ideals::groebner_basis::*;
+use crate::ideals::*;
 
 fn vec_poly_str<'a, P: PolyRing>(poly: &Vec<Poly<'a, P>>) -> String {
     poly.iter()
@@ -158,6 +158,7 @@ mod tests {
     use crate::parse::MyFromStr;
     use crate::polym::*;
     use generic_array::typenum::{U2, U3};
+    use crate::ideals::groebner_basis::*;
 
     #[test]
     fn f4_test() {
@@ -170,6 +171,18 @@ mod tests {
 
         let gb = f4(f_vec);
         println!("The Grobner basis = \n{}", gb);
+        assert!(is_groebner_basis(&gb));
+
+        let ring = PRDomain::<RR, MultiIndex<U3>, GLex>::new(vec!['x', 'y', 'z']);
+        let f_vec = vec![
+                Poly::from_str(&ring, "1.0x^1y^2 + 1.0x^1y^1 - 1.0").unwrap(),
+                Poly::from_str(&ring, "1.0x^2 - 1.0z^2").unwrap(),
+                Poly::from_str(&ring, "1.0x^2 - 1.0z^2 + 1.0x^1y^1 + 1.0").unwrap(),
+            ];
+
+        let gb = f4(f_vec);
+        println!("The Grobner basis = \n{}", gb);
+        assert!(is_groebner_basis(&gb));
     }
 
     #[test]
