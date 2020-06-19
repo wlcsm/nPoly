@@ -95,13 +95,15 @@ pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     }
     // We now assume the first layer is done and reverse bit order satisfied
 
-    // Starts at index two because we already handled the first one
-    for i in 2..=log2_unchecked(n) {
-        let flut = 1 << i; // No. of elements in a flutter
-                           // Iterate over all the flutters, j is their starting index
+    // Starts at layer two because we already handled the first one
+    for i in 2..log2_unchecked(n) {
+        let flut = 1 << i; // No. of elements in a flutter, 2^i
+
+        // Iterate over all the flutters, j is their starting index
         for j in (0..n).step_by(flut) {
             // Width of the k-flutter (number of elements)
-            for (k, l) in (j..j + (flut >> 1)).zip(j + (flut >> 1)..j + flut) {
+            for k in j .. (j + (flut / 2)) {
+                let l = k + flut / 2;
                 let a = signal[k];
                 let rou_b = rou[(k % flut) * (n >> i)].mul(&signal[l]); // w^j * b
                 signal[k] = a.add(&rou_b); // a + w^j * b
@@ -124,6 +126,7 @@ mod tests {
 
     use rand::distributions::{Distribution, Uniform};
 
+    // TODO I'm not sure this is correctly working, I changed the =log2_unchecked to log2_unchecked
     #[test]
     fn bench_dense_main() {
         let ring = PRDomain::<CC, UniIndex, UnivarOrder>::new(vec!['x']);
@@ -159,27 +162,27 @@ mod tests {
         }
     }
 
-    #[test]
-    fn mult_test_main() {
-        // Postponing until I get the fast multiplication for ZZ working
+    // #[test]
+    // fn mult_test_main() {
+    //     // Postponing until I get the fast multiplication for ZZ working
 
-        // let ring = PRDomain::univar(1);
-        // let a = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(1)]);
-        // let b = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(3)]);
-        // let c = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(2), ZZ(1)]);
+    //     // let ring = PRDomain::univar(1);
+    //     // let a = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(1)]);
+    //     // let b = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(3)]);
+    //     // let c = Poly::from_coeff(&ring, vec![ZZ(1), ZZ(2), ZZ(1)]);
 
-        // assert_eq!(a.mul(&b), a.fast_mult(&b));
-        // assert_eq!(b.mul(&c), b.fast_mult(&c));
-        // assert_eq!(c.mul(&a), c.fast_mult(&a));
+    //     // assert_eq!(a.mul(&b), a.fast_mult(&b));
+    //     // assert_eq!(b.mul(&c), b.fast_mult(&c));
+    //     // assert_eq!(c.mul(&a), c.fast_mult(&a));
 
-        // let d = Poly::from_coeff(ring, vec![ZZ(-1), ZZ(3)]);
-        // let e = Poly::from_coeff(ring, vec![ZZ(-1), ZZ(3), ZZ(4), ZZ(6)]);
+    //     // let d = Poly::from_coeff(ring, vec![ZZ(-1), ZZ(3)]);
+    //     // let e = Poly::from_coeff(ring, vec![ZZ(-1), ZZ(3), ZZ(4), ZZ(6)]);
 
-        // assert_eq!(d.mul(&a), d.fast_mult(&a));
-        // assert_eq!(d.mul(&e), d.fast_mult(&e));
+    //     // assert_eq!(d.mul(&a), d.fast_mult(&a));
+    //     // assert_eq!(d.mul(&e), d.fast_mult(&e));
 
-        // let f = Poly::from_coeff(ring, vec![ZZ(0)]);
+    //     // let f = Poly::from_coeff(ring, vec![ZZ(0)]);
 
-        // assert_eq!(f.mul(&a), f.fast_mult(&a));
-    }
+    //     // assert_eq!(f.mul(&a), f.fast_mult(&a));
+    // }
 }

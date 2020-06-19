@@ -1047,6 +1047,7 @@ Id	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/alga-0.
 Id	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/alga-0.9.3/src/linear/id.rs	/^impl<E: EuclideanSpace> Similarity<E> for Id {$/;"	c
 Id	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/alga-0.9.3/src/linear/id.rs	/^impl<E: EuclideanSpace> Transformation<E> for Id {$/;"	c
 Id	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/alga-0.9.3/src/linear/id.rs	/^impl<E: EuclideanSpace> Translation<E> for Id {$/;"	c
+Ideal	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^impl<'a, P: FPolyRing> Ideal<'a, P> {$/;"	c
 Ideal	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^impl<'a, P: PolyRing> Ideal<'a, P> {$/;"	c
 Ideal	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {$/;"	c
 Ideal	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^pub struct Ideal<'a, P: PolyRing> {$/;"	s
@@ -4194,7 +4195,7 @@ add	/Users/williamcashman/Honours/Program/n_poly/src/algebras/polyring.rs	/^    
 add	/Users/williamcashman/Honours/Program/n_poly/src/algebras/polyring.rs	/^    fn add(&self, other: &Self) -> Self;$/;"	P	interface:Variate
 add	/Users/williamcashman/Honours/Program/n_poly/src/algebras/polyring.rs	/^    pub fn add(&self, other: &Self) -> Self {$/;"	P	implementation:Poly
 add	/Users/williamcashman/Honours/Program/n_poly/src/algebras/real.rs	/^    fn add(&self, other: &Self) -> Self {$/;"	P	implementation:RR
-add	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^    pub fn add(&mut self, item: Poly<'a, P>) {$/;"	P	implementation:Ideal
+add	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^    pub fn add(&mut self, item: Poly<'a, P>) -> Option<&Poly<'a, P>> {$/;"	P	implementation:Ideal
 add	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^    pub fn add(&mut self, item: Term<P>) {$/;"	P	implementation:MonomialIdeal
 add	/Users/williamcashman/Honours/Program/n_poly/src/polym.rs	/^    fn add(&self, other: &Self) -> Self {$/;"	P	implementation:MultiIndex
 add	/Users/williamcashman/Honours/Program/n_poly/src/polyu.rs	/^    fn add(&self, other: &Self) -> Self {$/;"	P	implementation:UniIndex
@@ -4510,13 +4511,16 @@ basics	/Users/williamcashman/Honours/Program/n_poly/src/algebras/finite_field.rs
 basics	/Users/williamcashman/Honours/Program/n_poly/src/lib.rs	/^    fn basics() {$/;"	f	module:tests
 batching	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/adaptors/mod.rs	/^pub fn batching<I, F>(iter: I, f: F) -> Batching<I, F> {$/;"	f
 batching	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/lib.rs	/^    fn batching<B, F>(self, f: F) -> Batching<Self, F>$/;"	P	interface:Itertools
-bb_algorithm	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^pub fn bb_algorithm<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> Vec<Poly<'a, P>> {$/;"	f
+bb_alg_test	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    fn bb_alg_test() {$/;"	f	module:tests
+bb_algorithm	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    pub fn bb_algorithm(&self) -> Self {$/;"	P	implementation:Ideal
+bb_algorithm_impr	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    pub fn bb_algorithm_impr(&self) -> Self {$/;"	P	implementation:Ideal
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:Range
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:RangeFrom
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:RangeFull
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:RangeTo
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, _: D) -> usize {$/;"	P	implementation:usize
 begin	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/matrix_slice.rs	/^    fn begin(&self, shape: D) -> usize;$/;"	P	interface:SliceRange
+bench_bb_alg	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    fn bench_bb_alg() {$/;"	f	module:tests
 bench_datetime_from_str	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.10/src/datetime.rs	/^    fn bench_datetime_from_str(bh: &mut test::Bencher) {$/;"	f	module:tests
 bench_datetime_parse_from_rfc2822	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.10/src/datetime.rs	/^    fn bench_datetime_parse_from_rfc2822(bh: &mut test::Bencher) {$/;"	f	module:tests
 bench_datetime_parse_from_rfc3339	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.10/src/datetime.rs	/^    fn bench_datetime_parse_from_rfc3339(bh: &mut test::Bencher) {$/;"	f	module:tests
@@ -4524,6 +4528,7 @@ bench_datetime_to_rfc2822	/Users/williamcashman/.cargo/registry/src/github.com-1
 bench_datetime_to_rfc3339	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.10/src/datetime.rs	/^    fn bench_datetime_to_rfc3339(bh: &mut test::Bencher) {$/;"	f	module:tests
 bench_dense_main	/Users/williamcashman/Honours/Program/n_poly/src/fft-multi-base.rs	/^    fn bench_dense_main() {$/;"	f	module:tests
 bench_dense_main	/Users/williamcashman/Honours/Program/n_poly/src/fft.rs	/^    fn bench_dense_main() {$/;"	f	module:tests
+bench_f4	/Users/williamcashman/Honours/Program/n_poly/src/ideals/f4.rs	/^    fn bench_f4() {$/;"	f	module:tests
 bench_year_flags_from_year	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.10/src/naive/internals.rs	/^    fn bench_year_flags_from_year(bh: &mut test::Bencher) {$/;"	f	module:tests
 bernoulli	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/rand-0.7.3/src/distributions/mod.rs	/^mod bernoulli;$/;"	n
 bias	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/geometry/reflection.rs	/^    bias: N,$/;"	m	struct:Reflection
@@ -7087,7 +7092,7 @@ is_greater_private	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299
 is_greater_private	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/typenum-1.12.0/src/private.rs	/^    fn is_greater_private(self, _: B, _: Equal) -> Self::Output {$/;"	P	implementation:A
 is_greater_private	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/typenum-1.12.0/src/private.rs	/^    fn is_greater_private(self, _: B, _: Greater) -> Self::Output {$/;"	P	implementation:A
 is_greater_private	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/typenum-1.12.0/src/private.rs	/^    fn is_greater_private(self, _: B, _: Less) -> Self::Output {$/;"	P	implementation:A
-is_groebner_basis	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^pub fn is_groebner_basis<'a, P: FPolyRing>(g: &Ideal<'a, P>) -> bool {$/;"	f
+is_groebner_basis	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    pub fn is_groebner_basis(&self) -> bool {$/;"	P	implementation:Ideal
 is_identity	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/properties.rs	/^    pub fn is_identity(&self, eps: N::Epsilon) -> bool$/;"	P	implementation:Matrix
 is_in	/Users/williamcashman/Honours/Program/n_poly/src/ideals/mod.rs	/^    pub fn is_in(&self, term: &Term<P>) -> bool {$/;"	P	implementation:MonomialIdeal
 is_in_subset	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/alga-0.9.3/src/general/identity.rs	/^    fn is_in_subset(t: &T) -> bool {$/;"	P	implementation:Id
@@ -7893,7 +7898,6 @@ mul_assign	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823
 mul_scalar	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/size_hint.rs	/^pub fn mul_scalar(sh: SizeHint, x: usize) -> SizeHint {$/;"	f
 mul_to	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/ops.rs	/^    pub fn mul_to<R2: Dim, C2: Dim, SB, R3: Dim, C3: Dim, SC>($/;"	f
 mult_test_main	/Users/williamcashman/Honours/Program/n_poly/src/fft-multi-base.rs	/^    fn mult_test_main() {$/;"	f	module:tests
-mult_test_main	/Users/williamcashman/Honours/Program/n_poly/src/fft.rs	/^    fn mult_test_main() {$/;"	f	module:tests
 multi_cartesian_product	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/adaptors/multi_product.rs	/^pub fn multi_cartesian_product<H>(iters: H) -> MultiProduct<<H::Item as IntoIterator>::IntoIter>$/;"	f
 multi_cartesian_product	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/lib.rs	/^    fn multi_cartesian_product(self) -> MultiProduct<<Self::Item as IntoIterator>::IntoIter>$/;"	P	interface:Itertools
 multi_line	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/regex-1.3.7/src/re_builder.rs	/^    pub multi_line: bool,$/;"	m	struct:RegexOptions
@@ -8636,7 +8640,6 @@ polyring	/Users/williamcashman/Honours/Program/n_poly/src/algebras/mod.rs	/^pub 
 polyu	/Users/williamcashman/Honours/Program/n_poly/src/lib.rs	/^pub mod polyu;$/;"	n
 pool	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/combinations.rs	/^    pool: LazyBuffer<I>,$/;"	m	struct:Combinations
 pool	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/itertools-0.9.0/src/combinations_with_replacement.rs	/^    pool: LazyBuffer<I>,$/;"	m	struct:CombinationsWithReplacement
-pop	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    fn pop(&mut self) -> Option<Term<P>> {$/;"	P	implementation:Poly
 pop_back	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/cached-0.12.0/src/stores.rs	/^    fn pop_back(&mut self) -> T {$/;"	P	implementation:LRUList
 pop_back	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/generic-array-0.14.1/src/sequence.rs	/^    fn pop_back(self) -> (Self::Shorter, T) {$/;"	f
 pop_back	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/generic-array-0.14.1/src/sequence.rs	/^    fn pop_back(self) -> (Self::Shorter, T);$/;"	P	interface:Shorten
@@ -9224,7 +9227,7 @@ rustc_serialize	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9
 rustc_serialize	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/chrono-0.4.10/src/naive/time.rs	/^mod rustc_serialize {$/;"	n
 s	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/linalg/givens.rs	/^    pub fn s(&self) -> N {$/;"	P	implementation:GivensRotation
 s	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/linalg/givens.rs	/^    s: N,$/;"	m	struct:GivensRotation
-s_poly	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^    fn s_poly(&self, other: &Self) -> Self {$/;"	P	implementation:Poly
+s_poly	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^fn s_poly<'a, P: FPolyRing>(lhs: &Poly<'a, P>, rhs: &Poly<'a, P>) -> Poly<'a, P> {$/;"	f
 sample	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/construction.rs	/^    fn sample<'a, G: Rng + ?Sized>(&self, rng: &'a mut G) -> MatrixMN<N, R, C> {$/;"	f
 sample	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/base/construction.rs	/^    fn sample<'a, G: Rng + ?Sized>(&self, rng: &'a mut G) -> Unit<VectorN<N, D>> {$/;"	f
 sample	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/geometry/isometry_construction.rs	/^    fn sample<'a, G: Rng + ?Sized>(&self, rng: &'a mut G) -> Isometry<N, D, R> {$/;"	f
@@ -11016,6 +11019,7 @@ unit_complex_ops	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db
 unit_complex_simba	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/geometry/mod.rs	/^mod unit_complex_simba;$/;"	n
 unit_sphere	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/rand-0.7.3/src/distributions/mod.rs	/^#[cfg(feature = "std")] mod unit_sphere;$/;"	n
 unlink	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/cached-0.12.0/src/stores.rs	/^    fn unlink(&mut self, index: usize) {$/;"	P	implementation:LRUList
+unord_pairs_int	/Users/williamcashman/Honours/Program/n_poly/src/ideals/groebner_basis.rs	/^fn unord_pairs_int(n: usize) -> Vec<(usize, usize)> {$/;"	f
 unpack	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/linalg/bidiagonal.rs	/^    pub fn unpack($/;"	f
 unpack	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/linalg/cholesky.rs	/^    pub fn unpack(mut self) -> MatrixN<N, D> {$/;"	f
 unpack	/Users/williamcashman/.cargo/registry/src/github.com-1ecc6299db9ec823/nalgebra-0.21.0/src/linalg/full_piv_lu.rs	/^    pub fn unpack($/;"	f

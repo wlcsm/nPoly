@@ -15,9 +15,14 @@ impl<'a, P: PolyRing> Ideal<'a, P> {
             gens: gens.into_iter().filter(|t| !t.is_zero()).collect()
         }
     }
-    pub fn add(&mut self, item: Poly<'a, P>) {
+    /// Returns a reference to the item if it was successfully added
+    /// Returns None if not
+    pub fn add(&mut self, item: Poly<'a, P>) -> Option<&Poly<'a, P>> {
         if !self.gens.contains(&item) && !item.is_zero() {
-            self.gens.push(item)
+            self.gens.push(item);
+            self.gens.last()
+        } else {
+            None
         }
     }
     pub fn num_gens(&self) -> usize {

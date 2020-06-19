@@ -263,6 +263,7 @@ impl<P: FPolyRing> Term<P> {
     }
 }
 
+use crate::ideals::f4::*;
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
 impl<'a, P: PolyRing> Poly<'a, P> {
     pub fn get(&self, i: usize) -> Option<&Term<P>> {
