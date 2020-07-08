@@ -15,6 +15,7 @@ pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug {}
 
 // This is where I use the associated_type_bounds feature
 pub trait FPolyRing: PolyRing<Coeff: Field> {}
+pub trait PolyRingDiscrete: PolyRing<Coeff: Eq + PartialEq + Ord> {}
 
 use generic_array::typenum::{U2, U3};
 
@@ -30,11 +31,29 @@ impl VarNumber for U3 {}
 // requirement I will use a Vector and contracts to ensure the number of symbols is equal to the
 // number of indices.
 use std::fmt;
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Clone)]
 pub struct PRDomain<R: ScalarRing, U: Variate, M: MonomialOrdering<U>> {
     pub(crate) vars: Vec<char>,
     ring_parameters: PhantomData<(R, U, M)>,
 }
+
+impl<F, U, M> PartialEq for PRDomain<F, U, M> 
+where
+    F: ScalarRing,
+    U: Variate,
+    M: MonomialOrdering<U>,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.vars == other.vars
+    }
+}
+
+impl<F, U, M> Eq for PRDomain<F, U, M> 
+where
+    F: ScalarRing,
+    U: Variate,
+    M: MonomialOrdering<U>
+{}
 
 impl<F, U, M> FPolyRing for PRDomain<F, U, M>
 where
@@ -89,7 +108,7 @@ where
 }
 
 // <><><><><><><><><><> Polynomial <><><><><><><><><><> //
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Poly<'a, P: PolyRing> {
     pub(crate) terms: Vec<Term<P>>,
     pub(crate) ring: &'a P,
@@ -107,7 +126,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         for el in terms_sorted {
             if let Some(last) = term_no_duplicates.last_mut() {
                 if el.deg == last.deg {
-                    last.coeff = last.coeff.add(&el.coeff);
+                    last.coeff = last.coeff + el.coeff;
                     continue;
                 }
             }
@@ -133,20 +152,20 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 mod tests {
 
     use super::*;
-    use crate::algebras::real::RR;
-    use crate::parse::*;
-    use crate::polyu::*;
+    // use crate::algebras::real::RR;
+    // use crate::parse::*;
+    // use crate::polyu::*;
 
-    #[test]
-    fn from_terms_test() {
-        let ring = PRDomain::<RR, UniIndex, UnivarOrder>::new(vec!['x']);
-        let a = Poly::from_str(&ring, "3.0x^2 + 5.0x^98 - 6.0x^2").unwrap();
-        println!("{:?}", a);
-        println!("{}", a);
-    }
+    // #[test]
+    // fn from_terms_test() {
+    //     let ring = PRDomain::<RR, UniIndex, UnivarOrder>::new(vec!['x']);
+    //     let a = Poly::from_str(&ring, "3.0x^2 + 5.0x^98 - 6.0x^2").unwrap();
+    //     println!("{:?}", a);
+    //     println!("{}", a);
+    // }
 }
 // <><><><><><><><><><> Term <><><><><><><><><><> //
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Term<P: PolyRing> {
     pub coeff: P::Coeff,
     pub deg: P::Var,
@@ -154,13 +173,23 @@ pub struct Term<P: PolyRing> {
 
 use std::cmp::{Ord, PartialOrd};
 
-impl<P: PolyRing> Ord for Term<P> {
+impl<P: PolyRingDiscrete> PartialEq for Term<P> {
+    fn eq(&self, other: &Self) -> bool {
+        self.deg == other.deg && self.coeff == other.coeff
+    }
+}
+
+impl<P: PolyRingDiscrete> Eq for Term<P> {}
+
+impl<P: PolyRingDiscrete> Ord for Term<P> {
     fn cmp(&self, other: &Self) -> Ordering {
         <P::Ord>::cmp(&self.deg, &other.deg)
     }
 }
 
-impl<P: PolyRing> PartialOrd for Term<P> {
+use alga::general::{Identity, Additive, AbstractGroup, Multiplicative};
+
+impl<P: PolyRingDiscrete> PartialOrd for Term<P> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -171,9 +200,9 @@ impl<P: PolyRing> Term<P> {
         Term { coeff, deg }
     }
 
-    pub fn scale(&self, scalar: &P::Coeff) -> Self {
-        Term::new(self.coeff.mul(scalar), self.deg.clone())
-    }
+    // pub fn scale(&self, scalar: &P::Coeff) -> Self {
+    //     Term::new(self.coeff.mul(scalar), self.deg.clone())
+    // }
     pub fn cmpdeg(&self, other: Self) -> Ordering {
         <P::Ord>::cmp(&self.deg, &other.deg)
     }
@@ -183,31 +212,36 @@ impl<P: PolyRing> Zero for Term<P> {
         Term::new(<P::Coeff>::zero(), <P::Var>::zero())
     }
 }
-impl<P: PolyRing> One for Term<P> {
+
+// impl<P: PolyRing> One for Term<P> {
+//     fn one() -> Self {
+//         Term::new(<P::Coeff>::one(), <P::Var>::zero())
+//     }
+// }
+
+impl<T: AbstractGroup<Multiplicative>> One for T {
     fn one() -> Self {
-        Term::new(<P::Coeff>::one(), <P::Var>::zero())
+        <Self as Identity<Multiplicative>>::identity()
     }
 }
 
-impl<P: PolyRing> Ring for Term<P> {
-    type BaseRing = P::Coeff;
-    // Group operations
-    fn add(&self, _other: &Self) -> Self {
-        unimplemented!()
+impl<T: AbstractGroup<Additive>> Zero for T {
+    fn zero() -> Self {
+        <Self as Identity<Additive>>::identity()
     }
-    fn sub(&self, _other: &Self) -> Self {
-        unimplemented!()
-    }
+}
+
+impl<P: PolyRing> Term<P> {
     fn neg(&self) -> Self {
-        Term::new(self.coeff.neg(), self.deg.clone())
+        Term::new(-self.coeff, self.deg.clone())
     }
     // Ring operations
     fn mul(&self, other: &Self) -> Self {
-        Term::new(self.coeff.mul(&other.coeff), self.deg.add(&other.deg))
+        Term::new(self.coeff * other.coeff, self.deg.add(&other.deg))
     }
 }
 
-impl<E, P> EuclideanDomain for Term<P>
+impl<E, P> Term<P>
 where
     E: ScalarRing + EuclideanDomain,
     P: PolyRing<Coeff = E>,
@@ -263,7 +297,6 @@ impl<P: FPolyRing> Term<P> {
     }
 }
 
-use crate::ideals::f4::*;
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
 impl<'a, P: PolyRing> Poly<'a, P> {
     pub fn get(&self, i: usize) -> Option<&Term<P>> {
@@ -318,7 +351,7 @@ pub trait MonomialOrdering<I: Variate>: Clone + Eq {
     fn cmp(a: &I, b: &I) -> Ordering;
 }
 
-pub trait Variate: Zero + Clone + Eq + Debug {
+pub trait Variate: Zero + Clone + Eq + Debug + Ord {
     type NumVar: VarNumber;
 
     fn get(&self, ind: usize) -> Option<&usize>;
@@ -340,7 +373,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         let new_terms = self
             .terms
             .iter()
-            .map(|Term { coeff, deg }| Term::new(coeff.mul(&term.coeff), deg.add(&term.deg)))
+            .map(|Term { coeff, deg }| Term::new(*coeff + term.coeff, deg.add(&term.deg)))
             .collect();
         Poly::from_terms_unchecked(new_terms, self.ring)
     }
@@ -368,19 +401,11 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         Poly::from_terms_unchecked(vec![], self.ring)
     }
 
-    pub fn is_one(&self) -> bool {
-        self.num_terms() == 1 && self.get(0).unwrap().coeff == <P::Coeff>::one()
-    }
-
-    pub fn one(&self) -> Self {
-        Poly::from_terms_unchecked(vec![Term::one()], self.ring)
-    }
-
     pub fn scale(&self, scalar: P::Coeff) -> Self {
         if scalar == <P::Coeff>::zero() {
             Poly::zero(&self)
         } else {
-            self.elementwise_map(|t| t.scale(&scalar))
+            self.elementwise_map(|t| Term::new(t.coeff * scalar, t.deg.clone()))
         }
     }
 
@@ -420,28 +445,29 @@ impl<'a, P: PolyRing> Poly<'a, P> {
 
         while i < smol.num_terms() {
             let (a, b) = (smol.get_uc(i), bigg.get_uc(j));
-            res.push(match a.cmp(b) {
-                // Compare their degrees
-                Ordering::Less => {
-                    i += 1;
-                    a.clone()
-                }
-                Ordering::Greater => {
-                    j += 1;
-                    b.clone()
-                }
-                Ordering::Equal => {
-                    i += 1;
-                    j += 1;
-                    let c = a.coeff.add(&b.coeff);
-                    if c == <P::Coeff>::zero() {
-                        continue;
+            res.push(
+                match a.deg.cmp(&b.deg) {
+                    // Compare their degrees
+                    Ordering::Less => {
+                        i += 1;
+                        a.clone()
                     }
-                    Term {
-                        coeff: c,
-                        deg: a.deg.clone(),
+                    Ordering::Greater => {
+                        j += 1;
+                        b.clone()
                     }
-                }
+                    Ordering::Equal => {
+                        i += 1;
+                        j += 1;
+                        let c = a.coeff + b.coeff;
+                        if c == <P::Coeff>::zero() {
+                            continue;
+                        }
+                        Term {
+                            coeff: c,
+                            deg: a.deg.clone(),
+                        }
+                    }
             })
         }
 

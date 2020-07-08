@@ -8,8 +8,7 @@ edition = "2018"
 # opt-level = 3
 
 [dependencies]
-cached = "0.12.0"
-num-complex = "0.2.4"
+num-complex = "0.3.0"
 log = "0.4.8"
 env_logger = "0.7.1"
 num-traits = "0.2"

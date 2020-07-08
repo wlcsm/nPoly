@@ -1,32 +1,33 @@
 pub mod complex;
-pub mod finite_field;
+// pub mod finite_field;
 pub mod integers;
 pub mod polyring;
-pub mod real;
+// pub mod real;
+use alga::general::Ring;
 
 /// The original motivation for making my own copies of the sub and add traits is so that
 /// I can borrow self rather than taking ownership
 
-// The group trait is used in the MonomialIndex trait
-pub trait Group: Zero + Sized + Eq + Clone {
-    fn add(&self, other: &Self) -> Self;
-    fn sub(&self, other: &Self) -> Self;
-    fn neg(&self) -> Self;
-}
+// // The group trait is used in the MonomialIndex trait
+// pub trait Group: Zero + Sized + Eq + Clone {
+//     fn add(&self, other: &Self) -> Self;
+//     fn sub(&self, other: &Self) -> Self;
+//     fn neg(&self) -> Self;
+// }
 
-// For the moment i'm also assuming that the rings are integral domains
-pub trait Ring: Zero + One + Sized + Eq + Clone {
-    type BaseRing: ScalarRing + std::fmt::Debug;
-    // Group operations
-    fn add(&self, other: &Self) -> Self;
-    fn sub(&self, other: &Self) -> Self;
-    fn neg(&self) -> Self;
-    // Ring operations
-    fn mul(&self, other: &Self) -> Self;
-}
+// // For the moment i'm also assuming that the rings are integral domains
+// pub trait Ring: Zero + One + Sized + Eq + Clone {
+//     type BaseRing: ScalarRing + std::fmt::Debug;
+//     // Group operations
+//     fn add(&self, other: &Self) -> Self;
+//     fn sub(&self, other: &Self) -> Self;
+//     fn neg(&self) -> Self;
+//     // Ring operations
+//     fn mul(&self, other: &Self) -> Self;
+// }
 
 pub trait ScalarRing:
-    Ring + Copy + std::fmt::Debug + std::str::FromStr + std::fmt::Display
+    alga::general::Ring + Copy + std::fmt::Debug + std::str::FromStr + std::fmt::Display
 {
     const REGEX: &'static str;
     fn add_ass(&mut self, other: &Self);
