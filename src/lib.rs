@@ -1,22 +1,30 @@
 #![feature(associated_type_bounds)]
+#![feature(const_generics)]
+#![feature(specialization)]
+
+// #[_warn(incomplete_features)]
 /// The polynomial crate
 extern crate generic_array;
 #[macro_use]
 extern crate itertools;
 extern crate nalgebra;
-extern crate alga;
+// extern crate alga;
+// #[macro_use]
+// extern crate alga_derive;
+
 #[macro_use]
-extern crate alga_derive;
+extern crate impl_ops;
 
 pub mod algebras;
-// pub mod error;
-// pub mod fast_mult;
-// pub mod fft;
-// pub mod ideals;
-// pub mod mathutils;
-// pub mod parse;
-// pub mod polym;
-// pub mod polyu;
+
+pub mod error;
+pub mod fast_mult;
+pub mod fft;
+pub mod ideals;
+pub mod mathutils;
+pub mod parse;
+pub mod polym;
+pub mod polyu;
 // pub mod sparse;
 
 // #[cfg(test)]

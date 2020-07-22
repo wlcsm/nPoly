@@ -4,7 +4,7 @@ extern crate chrono;
 use crate::algebras::*;
 use crate::mathutils::log2_unchecked;
 
-pub trait SupportsFFT: Field {
+pub trait SupportsFFT: ScalarField {
     // Generates the roots of unity
     fn rou(n: usize, inv: bool) -> Vec<Self>;
     fn divby2(&mut self, n: usize);
@@ -28,7 +28,7 @@ where
 
     // Multiply elementwise
     for i in 0..n {
-        a_sig[i].mul_ass(&b_sig[i]);
+        a_sig[i] += b_sig[i];
     }
 
     // Interpolate the result
@@ -43,17 +43,16 @@ pub fn dft<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     // Generate the nth roots of unity
     let rou = <F>::rou(n, inv);
 
-    // Evaluates: p * q mod n.
+    // Evaluates: p * q mod n. Rust's modulo function gives negative numbers
     let modx = |p, q| (((p * q) % n) + n) % n;
 
     // F(k) = \sum^n_{j=0} x_j e^{-2\pi i jk / n}
     for k in 0..n {
-        let term = result
+        signal[k] = result
             .iter()
             .enumerate()
-            .map(|(i, c)| rou[modx(k, i)].mul(c))
-            .fold(<F>::zero(), |a, b| a.add(&b));
-        signal[k] = term;
+            .map(|(i, c)| rou[modx(k, i)] * *c)
+            .fold(<F>::zero(), |a, b| a + b);
     }
 }
 
@@ -76,22 +75,22 @@ pub fn perform_fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'
     }
 }
 
-pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
-    // Assumes that the length of 'signal' is >= 4
+pub fn go_fast<F: SupportsFFT>(sig: &mut [F], inv: bool) {
+    // Assumes that the length of 'sig' is >= 4
 
-    let n = signal.len();
+    let n = sig.len();
     let rou = <F>::rou(n, inv); // Generates roots of unity
 
     // Does first iteration and puts into reverse bit order.
     for (i, j) in (0..n / 2).zip(n / 2..n).step_by(2) {
-        let x_0 = signal[i];
-        let x_0_n2 = signal[j];
-        let x_1 = signal[i + 1];
-        let x_1_n2 = signal[j + 1];
-        signal[i] = x_0.add(&x_0_n2);
-        signal[j] = x_1.add(&x_1_n2);
-        signal[i + 1] = x_0.sub(&x_0_n2);
-        signal[j + 1] = x_1.sub(&x_1_n2);
+        let x_0 = sig[i];
+        let x_0_n2 = sig[j];
+        let x_1 = sig[i + 1];
+        let x_1_n2 = sig[j + 1];
+        sig[i] = x_0 + x_0_n2;
+        sig[j] = x_1 + x_1_n2;
+        sig[i + 1] = x_0 - x_0_n2;
+        sig[j + 1] = x_1 - x_1_n2;
     }
     // We now assume the first layer is done and reverse bit order satisfied
 
@@ -104,10 +103,10 @@ pub fn go_fast<F: SupportsFFT>(signal: &mut [F], inv: bool) {
             // Width of the k-flutter (number of elements)
             for k in j .. (j + (flut / 2)) {
                 let l = k + flut / 2;
-                let a = signal[k];
-                let rou_b = rou[(k % flut) * (n >> i)].mul(&signal[l]); // w^j * b
-                signal[k] = a.add(&rou_b); // a + w^j * b
-                signal[l] = a.sub(&rou_b); // a + w^{j + n/2} * b
+                let a = sig[k];
+                let rou_b = rou[(k % flut) * (n >> i)] * sig[l]; // w^j * b
+                sig[k] = a + rou_b; // a + w^j * b
+                sig[l] = a - rou_b; // a + w^{j + n/2} * b
             }
         }
     }
@@ -129,7 +128,7 @@ mod tests {
     // TODO I'm not sure this is correctly working, I changed the =log2_unchecked to log2_unchecked
     #[test]
     fn bench_dense_main() {
-        let ring = PRDomain::<CC, UniIndex, UnivarOrder>::new(vec!['x']);
+        let ring = PRDomain::<CC, UniVarOrder>::new(vec!['x']);
 
         // Note all coefficients are nonzero
         let dist = Uniform::from(1..100);

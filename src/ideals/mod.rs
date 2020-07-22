@@ -1,5 +1,6 @@
 use crate::algebras::*;
 use crate::algebras::polyring::*;
+use num_traits::Zero;
 
 pub mod f4;
 pub mod groebner_basis;

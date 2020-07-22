@@ -1,8 +1,8 @@
 use crate::algebras::polyring::*;
-use crate::algebras::*;
+// use crate::algebras::*;
 use crate::fft::*;
 use crate::mathutils::log2_unchecked;
-use crate::polyu::*;
+// use crate::polyu::*;
 
 pub trait FastMult {
     fn fast_mult(&self, b: &Self) -> Self;
@@ -24,14 +24,15 @@ pub trait FastMult {
 //     result
 // }
 
+use num_traits::Zero;
+
+/// Expands the input into a coefficient vector padded with zeros to length n
 fn to_coeffs<P: PolyRing>(input: &Vec<Term<P>>, n: usize) -> Vec<P::Coeff> {
-    // Expands the input into the expanded coefficient vector (coerced into complex)
-    // Then padded with zeros to length n
 
     let mut result: Vec<P::Coeff> = Vec::with_capacity(n);
-    for Term { coeff, deg } in input.iter() {
+    for Term { coeff, mon } in input.iter() {
         // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(deg.tot_deg(), <P::Coeff>::zero());
+        result.resize(mon.tot_deg(), <P::Coeff>::zero());
         result.push(*coeff);
     }
     // Pad the rest
@@ -39,10 +40,13 @@ fn to_coeffs<P: PolyRing>(input: &Vec<Term<P>>, n: usize) -> Vec<P::Coeff> {
     result
 }
 
-// TODO these two implementations should be one macro
+use crate::polyu::*;
+
 impl<'a, T: SupportsFFT> FastMult for PolyU<'a, T> {
+    // FFT Multiplication
     fn fast_mult(&self, other: &Self) -> Self {
         let n = (self.deg() + other.deg() + 1).next_power_of_two();
+
         let mut a_sig = to_coeffs(&self.terms, n);
         let mut b_sig = to_coeffs(&other.terms, n);
 
@@ -55,10 +59,30 @@ impl<'a, T: SupportsFFT> FastMult for PolyU<'a, T> {
         }
 
         // Convert back into polynomial type
-        Poly::from_coeff(self.ring, a_sig)
+        Poly::from_coeff(self.ring.unwrap(), a_sig)
     }
 }
 
+// use generic_array::typenum::U1;
+
+// impl<'a, P: PolyRing<Var=U1>> FastMult for Poly<'a, P> {
+//     fn fast_mult(&self, other: &Self) -> Self {
+//         let n = (self.deg() + other.deg() + 1).next_power_of_two();
+//         let mut a_sig = to_coeffs(&self.terms, n);
+//         let mut b_sig = to_coeffs(&other.terms, n);
+
+//         // Infix on a_sig
+//         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
+
+//         // Need to normalise it here
+//         for x in a_sig.iter_mut() {
+//             x.divby2(log2_unchecked(n))
+//         }
+
+//         // Convert back into polynomial type
+//         Poly::from_coeff(self.ring, a_sig)
+//     }
+// }
 // Frozen this at the moment becaue it requires a change of type from CC to ZZ
 // which I don't feel like doing at the moment
 

@@ -7,6 +7,7 @@ extern crate regex;
 use crate::algebras::polyring::*;
 use crate::algebras::*;
 use crate::error::PolyErr;
+use num_traits::identities::Zero;
 
 use regex::Regex;
 
@@ -49,11 +50,11 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 
                 // Take into account if it is a subtraction
                 if let Some("-") = caps.name("sign").map(|c| c.as_str()) {
-                    coeff = coeff.neg();
+                    coeff = -coeff;
                 }
 
                 // Extract the indices of the interminates in the term
-                let mut degrees = P::Var::zero();
+                let mut degrees = P::Mon::zero();
                 for (i, symb) in ring.symb().iter().enumerate() {
                     if let Some(n) = caps.name(symb.to_string().as_str()) {
                         degrees.set(
@@ -67,7 +68,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 
                 acc.push(Term::new(coeff, degrees))
             }
-            Ok(Poly::<'a, P>::from_terms(acc, ring))
+            Ok(Poly::<'a, P>::from_terms(acc, Some(ring)))
         }
     }
 }
@@ -77,19 +78,19 @@ mod tests {
     use super::*;
     use crate::algebras::integers::ZZ;
     use crate::polym::*;
-    use crate::polyu::*;
+    // use crate::polyu::*;
     use generic_array::typenum::U2;
 
     #[test]
     fn parsing_test() {
         // Univariate
-        let ring = PRDomain::<ZZ, UniIndex, UnivarOrder>::new(vec!['x']);
-        let a = Poly::from_str(&ring, "3x^2 + 5x^98 + 0x^2 + 1x^2 - 1x^2").unwrap();
-        println!("{:?}", a);
-        println!("{}", a);
+        // let ring = PRDomain::<ZZ, UniIndex, UnivarOrder>::new(vec!['x']);
+        // let a = Poly::from_str(&ring, "3x^2 + 5x^98 + 0x^2 + 1x^2 - 1x^2").unwrap();
+        // println!("{:?}", a);
+        // println!("{}", a);
 
         // Multivariate
-        let ring = PRDomain::<ZZ, MultiIndex<U2>, Lex>::new(vec!['x', 'y']);
+        let ring = PRDomain::<ZZ, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
         let a = Poly::from_str(&ring, "3x^2y^6 + 5x^98y^2").unwrap();
         let b = Poly::from_str(&ring, "5x^6").unwrap();
         println!("a = {}", a);
