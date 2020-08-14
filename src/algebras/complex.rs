@@ -24,12 +24,12 @@ impl_op_ex!(-|a: &CC| -> CC { CC(-a.0) });
 impl_op_ex!(+ |a: &CC, b: &CC| -> CC { CC(a.0 + b.0) });
 impl_op_ex!(- |a: &CC, b: &CC| -> CC { CC(a.0 - b.0) });
 impl_op_ex!(* |a: &CC, b: &CC| -> CC { CC(a.0 * b.0) });
-impl_op_ex!(/ |a: &CC, b: &CC| -> CC { CC(a.0 * b.0) });
+impl_op_ex!(/ |a: &CC, b: &CC| -> CC { CC(a.0 / b.0) });
 
 impl_op_ex!(+= |a: &mut CC, b: &CC| { a.0 += b.0 });
 impl_op_ex!(-= |a: &mut CC, b: &CC| { a.0 -= b.0 });
 impl_op_ex!(*= |a: &mut CC, b: &CC| { a.0 *= b.0 });
-impl_op_ex!(/= |a: &mut CC, b: &CC| { a.0 *= b.0 });
+impl_op_ex!(/= |a: &mut CC, b: &CC| { a.0 /= b.0 });
 
 impl ClosedAdd for CC {}
 impl ClosedMul for CC {}

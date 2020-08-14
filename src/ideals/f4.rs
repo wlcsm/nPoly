@@ -1,13 +1,8 @@
 use crate::algebras::polyring::*;
 use num_traits::Zero;
 use crate::ideals::*;
+use crate::display::*; // Actually I think I want functions in this file to use display::
 
-fn vec_poly_str<'a, P: PolyRing>(poly: &Vec<Poly<'a, P>>) -> String {
-    poly.iter()
-        .map(|p| format!("{}", p))
-        .collect::<Vec<String>>()
-        .join("\n")
-}
 
 /// Converts the generators into a Groebner basis using the F4 algorithm
 /// Psuedocode in CLO
@@ -24,17 +19,24 @@ pub fn f4<'a, P: FPolyRing>(f_gens: Vec<Poly<'a, P>>) -> Ideal<'a, P> {
             .map(|(i, j)| left_hand_s_poly(&g_basis.gens[i], &g_basis.gens[j]))
             .collect();
 
+        println!("l_mat before = {}", show_vec_poly(&l_mat));
         compute_m(&mut l_mat, &g_basis);
-        let m_init = MonomialIdeal::new(l_mat.iter().map(|m| m.lt()).collect());
+        println!("l_mat after = {}", show_vec_poly(&l_mat));
+
+        let m_init = MonomialIdeal::<P>::new(l_mat.iter().map(|m| m.lm()).collect());
 
         // Row reduction and find the new elements
         row_reduce(&mut l_mat);
+        println!("l_mat reduced = {}", show_vec_poly(&l_mat));
+
+        println!("m_init = {:?}", m_init.gens);
         let n_plus: Vec<Poly<'a, P>> = l_mat
             .into_iter()
-            .filter(|n| !n.is_zero() && !m_init.is_in(&n.lt()))
+            .filter(|n| !n.is_zero() && !m_init.is_in(&n.lm()))
             .collect();
 
         for n in n_plus {
+            println!("Newly added poly = {}", n);
             g_basis.add(n);
             // TODO for some reason this failed, i.e. the .add() method didn't actually add
             // anything to the list of generators, this is weird because by the construction
@@ -47,13 +49,10 @@ pub fn f4<'a, P: FPolyRing>(f_gens: Vec<Poly<'a, P>>) -> Ideal<'a, P> {
             subsets.append(&mut new_pairs_r);
         }
     }
-    println!("Groebner basis = {}", vec_poly_str(&g_basis.gens));
-    println!("Is Grobner = {}", g_basis.is_groebner_basis());
+    println!("Before Reduction =  {}", show_vec_poly(&g_basis.gens));
 
     row_reduce(&mut g_basis.gens);
     g_basis.gens = g_basis.gens.into_iter().filter(|x| !x.is_zero()).collect();
-    println!("Row reduced = {}", vec_poly_str(&g_basis.gens));
-    println!("Is Grobner again = {}", g_basis.is_groebner_basis());
     g_basis
 }
 
@@ -61,27 +60,39 @@ pub fn f4<'a, P: FPolyRing>(f_gens: Vec<Poly<'a, P>>) -> Ideal<'a, P> {
 pub fn row_reduce<'a, P: FPolyRing>(mat: &mut Vec<Poly<'a, P>>) {
     // Standard row reduction, but operates on a vector of polynomials.
 
-    // mat.sort_by(|a, b| <P::Ord>::cmp(&b.lt().mon, &a.lt().mon));
     let mut i = 0;
 
     while i < mat.len() {
+        // TODO probably don't want to sort the entire thing every single time
+        mat.sort_by(|a, b| <P::Ord>::cmp(&b.lt().mon, &a.lt().mon));
         // Get one row. We then use this is cancel other rows
-        let lm = mat[i].lm();
-        if lm.is_zero() {
+        if mat[i].lc().is_zero() {
             i += 1;
             continue
         }
+        let lm = mat[i].lm();
+        println!("mat[i] = {}", mat[i]);
+
         let mut j = i + 1;
 
         // FIXME there is the potential for the lead terms to not cancel correctly due to
         // rounding error
         while j < mat.len() && mat[j].lm() == lm {
 
+            // println!("mat[j] before = {}", mat[j]);
+
             let scalar = mat[j].lc() / mat[i].lc();
             mat[i] *= scalar;
 
+            // println!("mat[i] scaled = {}", mat[i]);
+            //
             // Cancel the first term
             mat[j] = mat[j].ref_sub(&mat[i]);
+            if mat[j].lm() == lm {
+                mat[j].terms.pop();
+            }
+
+            // println!("mat[j] after cancellation = {}", mat[j]);
 
             j += 1
         }
@@ -90,10 +101,17 @@ pub fn row_reduce<'a, P: FPolyRing>(mat: &mut Vec<Poly<'a, P>>) {
         for j in (0..i).rev() {
             if let Some(c) = mat[j].has(&lm) {
                 // Cancel the lead terms
+                // println!("mat[j] before = {}", mat[j]);
+                // println!("mat[i] scaled = {}", mat[i]);
                 let scalar = c / mat[i].lc();
                 mat[i] *= scalar;
 
                 mat[j] = mat[j].ref_sub(&mat[i]);
+
+                if mat[j].lm() == lm {
+                    mat[j].terms.pop();
+                }
+                // println!("mat[j] after cancellation = {}", mat[j]);
             }
         }
         i += 1;
@@ -101,6 +119,7 @@ pub fn row_reduce<'a, P: FPolyRing>(mat: &mut Vec<Poly<'a, P>>) {
 
     mat.sort_by(|a, b| <P::Ord>::cmp(&b.lt().mon, &a.lt().mon));
 }
+
 
 fn choose_subset(pairs: &mut Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     // Returns a subset of B based on G, and also removes that subset from B
@@ -110,40 +129,19 @@ fn choose_subset(pairs: &mut Vec<(usize, usize)>) -> Vec<(usize, usize)> {
     a
 }
 
-// /// Monomial with an ordering built in
-// #[derive(PartialEq, Eq)]
-// struct Monomial<M: MonomialOrder<V>, V: Monomial>(V, PhantomData<M>);
-
-// impl<M: MonomialOrder<V>, V: Monomial> PartialOrd for Monomial<M, V> {
-//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//         Some(<M>::cmp(&self.0, &other.0))
-//     }
-// }
-
-// impl<M: MonomialOrder<V>, V: Monomial> Ord for Monomial<M, V> {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         <M>::cmp(&self.0, &other.0)
-//     }
-// }
-
-// impl<M: MonomialOrder<V>, V: Monomial> Monomial<M, V> {
-//     fn new(var: V) -> Self {
-//         Monomial(var, PhantomData)
-//     }
-// }
-
 
 use std::collections::HashMap;
 
 /// The ComputeM function in CLO
 /// TODO Document my algorithm below
 pub fn compute_m<'a, P: FPolyRing>(l_mat: &mut Vec<Poly<'a, P>>, g: &Ideal<'a, P>) {
-    // This line is a bit of a hack
+
     let g_init = MonomialIdeal::from(&g);
+
+    println!("ginit = {:?}", g_init);
 
     let mut i = 0;
 
-    // TODO Check whether it would be faster to use a HashMap
     let mut seen_monomials: HashMap<P::Mon, Vec<usize>> = HashMap::new();
 
     // Iterates through the monomials of the polynomials in the matrix and adds the extra
@@ -152,14 +150,20 @@ pub fn compute_m<'a, P: FPolyRing>(l_mat: &mut Vec<Poly<'a, P>>, g: &Ideal<'a, P
         let mut aux = Vec::new();
 
         // Go through the terms and add any that aren't already in there
-        for term in l_mat[i].terms.iter() {
+        // TODO In the compute_m_test l_matt[i] contains a zero term, which should be impossible.
+        // I have added the filter here as a temporary fix but need to come back later
+        // and properly find the root cause
+        for term in l_mat[i].terms.iter().filter(|x| !x.is_zero()) {
             // If term is in G_init, that is, there exists a polynomial in $g$ that divides it
-            if let Some(poly) = g_init.get_poly(&term) {
+            if let Some(poly) = g_init.get_poly(&term.mon) {
                 // Record the row we found this monomial in
                 match seen_monomials.get_mut(&term.mon.clone()) {
                     Some(x) => x.push(i),
                     None => {
                         // Evaluate x^\alpha f_\ell and push it the aux buffer
+                        println!("term = {:?}", term);
+                        println!("poly = {}", poly);
+                        println!("pushed = {}", poly * term.euclid_div(&poly.lt()).unwrap().0);
                         aux.push(poly * term.euclid_div(&poly.lt()).unwrap().0);
                         // Record that we have seen it
                         seen_monomials.insert(term.mon.clone(), vec![i]);
@@ -177,7 +181,6 @@ pub fn compute_m<'a, P: FPolyRing>(l_mat: &mut Vec<Poly<'a, P>>, g: &Ideal<'a, P
 pub fn left_hand_s_poly<'a, P: FPolyRing>(a: &Poly<'a, P>, b: &Poly<'a, P>) -> Poly<'a, P> {
     // Returns the "Left hand side" of the S-Polynomial of a and b
     let lcm = a.lt().lcm(&b.lt());
-    println!("a = {}", a);
     let scale = lcm.euclid_div(&a.lt()).unwrap().0;
     a * scale
 }
@@ -200,6 +203,7 @@ mod tests {
             ];
 
         let gb = f4(f_vec);
+        println!("gb = {}", gb);
         assert!(gb.is_groebner_basis());
 
         let ring = PRDomain::<RR, GLex<MultiIndex<U3>>>::new(vec!['x', 'y', 'z']);
@@ -210,9 +214,31 @@ mod tests {
             ];
 
         let gb = f4(f_vec);
+        println!("gb = {}", gb);
         assert!(gb.is_groebner_basis());
     }
 
+    #[test]
+    fn cancelling_test() {
+        let ring = PRDomain::<RR, GLex<MultiIndex<U3>>>::new(vec!['x', 'y', 'z']);
+        let mut j = Poly::from_str(&ring, "-1.0y^1 + 1.0y^1z^2 + 1.0x^1y^2").unwrap();
+        let mut i = Poly::from_str(&ring, "-1.0x^1 + -1.0y^1z^2").unwrap();
+
+        println!("yeet");
+        if let Some(c) = j.has(&i.lm()) {
+            // Cancel the lead terms
+            println!("mat[j] before = {}", j);
+            println!("mat[i] before scaled = {}", i);
+            let scalar = c / i.lc();
+            i *= scalar;
+            println!("mat[i] scaled = {}", i);
+
+            j = j.ref_sub(&i);
+
+            println!("mat[j] after cancellation = {}", j);
+        }
+
+    }
     use chrono::*;
 
     #[test]
@@ -252,7 +278,7 @@ mod tests {
 
     #[test]
     fn row_reduce_test() {
-        let ring = PRDomain::<RR, GLex<MultiIndex<U3>>>::new(vec!['x', 'y']);
+        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
 
         let mut f_vec = vec![
             Poly::from_str(&ring, "1.0x^1y^1 + 2.0x^1").unwrap(),
@@ -263,13 +289,13 @@ mod tests {
 
         row_reduce(&mut f_vec);
         println!("======================");
-        println!("{}", vec_poly_str(&f_vec));
+        println!("{}", show_vec_poly(&f_vec));
 
     }
 
     #[test]
     fn compute_m_test() {
-        let ring = PRDomain::<RR, GLex<MultiIndex<U3>>>::new(vec!['x', 'y']);
+        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
 
         let f_vec = vec![
             Poly::from_str(&ring, "1.0x^1y^1 + 2.0x^1").unwrap(),
@@ -280,16 +306,16 @@ mod tests {
         let t = f_vec.len();
         let subsets: Vec<(usize, usize)> = iproduct!(0..t, 0..t).filter(|(a, b)| a != b).collect();
 
-        let mut l_mat: Vec<Poly<PRDomain<RR, GLex<MultiIndex<U3>>>>> = subsets
+        let mut l_mat: Vec<Poly<PRDomain<RR, GLex<MultiIndex<U2>>>>> = subsets
             .into_iter()
             .map(|(i, j)| left_hand_s_poly(&g_basis.gens[i], &g_basis.gens[j]))
             .collect();
 
-        println!("{}", vec_poly_str(&l_mat));
+        println!("{}", show_vec_poly(&l_mat));
 
         compute_m(&mut l_mat, &g_basis);
         println!("===========================");
-        println!("{}", vec_poly_str(&l_mat));
+        println!("{}", show_vec_poly(&l_mat));
     }
 }
 

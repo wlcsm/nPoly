@@ -6,11 +6,11 @@ use std::cmp::Ordering;
 // Shorthand
 pub type PolyU<'a, R> = Poly<'a, PRDomain<R, UniVarOrder>>;
 
-pub trait PolyRingUni: PolyRing<Ord=UniVarOrder, Mon=UniIndex> {}
+pub trait PolyRingUni: PolyRing<NumVar=U1,Ord=UniVarOrder, Mon=UniIndex> {}
 
 impl<R: ScalarRing> PolyRingUni for PRDomain<R, UniVarOrder> {}
 
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct UniVarOrder();
 
 impl MonOrd for UniVarOrder {

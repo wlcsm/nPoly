@@ -1,6 +1,9 @@
 #![feature(associated_type_bounds)]
 #![feature(const_generics)]
-#![feature(specialization)]
+#![allow(incomplete_features)]
+#![feature(test)]
+
+extern crate test;
 
 // #[_warn(incomplete_features)]
 /// The polynomial crate
@@ -23,6 +26,7 @@ pub mod fft;
 pub mod ideals;
 pub mod mathutils;
 pub mod parse;
+pub mod display;
 pub mod polym;
 pub mod polyu;
 // pub mod sparse;

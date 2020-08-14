@@ -256,7 +256,7 @@ impl<N:VarNumber> IntoIterator for MultiIndex<N> {
 // }
 
 // TODO; Make this a macro to do all of them
-#[derive(Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub struct GLex<I: Monomial>(PhantomData<I>);
 
 impl<I: Monomial> MonOrd for GLex<I> {
@@ -371,8 +371,16 @@ impl<N: VarNumber> Monomial for MultiIndex<N> {
         Some(res)
     }
 
-    fn lex(&self, _other: &Self) -> Ordering {
-        unimplemented!()
+    /// The find map short-circuits when the two indices are not equal.
+    /// If they are all equal then it returns None, in which case we 
+    /// use a "map_or" to convert the None into a Ordering::Equal
+    fn lex(&self, other: &Self) -> Ordering {
+        izip!(&self.indices, &other.indices).find_map(|(a, b)| 
+            match a.cmp(&b) {
+                Ordering::Equal => None,
+                ord             => Some(ord)
+            })
+            .map_or(Ordering::Equal , |ord| {ord})
     }
 
     // fn divides(&self, other: &Self) -> Option<bool> {
@@ -404,9 +412,10 @@ impl<N: VarNumber> Monomial for MultiIndex<N> {
 }
 
 use std::fmt;
+use crate::display::*;
 
 // Problem is that it's hard to put an ordering on the coefficients because in finite fields
-// thats quite ambiguious. I need it in the "if x < 0" line
+// thats quite ambiguous. I need it in the "if x < 0" line
 // This will eventually have to be overcome some time.
 impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -414,12 +423,12 @@ impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
         if self.is_zero() {
             write!(f, "{}", <P::Coeff>::zero())
         } else {
-            let mut acc: String = self.terms[0].to_str(&self.ring);
+            let mut acc: String = show_term(&self.terms[0], &self.ring);
 
             self.terms
                 .iter()
                 .skip(1)
-                .for_each(|x| acc.push_str(&format!(" + {}", x.to_str(&self.ring))));
+                .for_each(|x| acc.push_str(&format!(" + {}", show_term(x, &self.ring))));
 
             write!(f, "{}", acc)
         }

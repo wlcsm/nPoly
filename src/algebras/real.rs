@@ -22,12 +22,12 @@ impl_op_ex!(-|a: &RR| -> RR { RR(-a.0) });
 impl_op_ex!(+ |a: &RR, b: &RR| -> RR { RR(a.0 + b.0) });
 impl_op_ex!(- |a: &RR, b: &RR| -> RR { RR(a.0 - b.0) });
 impl_op_ex!(* |a: &RR, b: &RR| -> RR { RR(a.0 * b.0) });
-impl_op_ex!(/ |a: &RR, b: &RR| -> RR { RR(a.0 * b.0) });
+impl_op_ex!(/ |a: &RR, b: &RR| -> RR { RR(a.0 / b.0) });
 
 impl_op_ex!(+= |a: &mut RR, b: &RR| { a.0 += b.0 });
 impl_op_ex!(-= |a: &mut RR, b: &RR| { a.0 -= b.0 });
 impl_op_ex!(*= |a: &mut RR, b: &RR| { a.0 *= b.0 });
-impl_op_ex!(/= |a: &mut RR, b: &RR| { a.0 *= b.0 });
+impl_op_ex!(/= |a: &mut RR, b: &RR| { a.0 /= b.0 });
 
 impl ClosedAdd for RR {}
 impl ClosedMul for RR {}
@@ -38,7 +38,7 @@ impl ScalarField for RR {}
 
 impl ScalarRing for RR {
     // Regex doesn't allow space on left or right hand side
-    const REGEX: &'static str = r"-?\d*\.\d*\s*(\+|-)\s*\d*\.\d*i";
+    const REGEX: &'static str = r"-?\d*\.\d*\s*";
 }
 
 use std::fmt;

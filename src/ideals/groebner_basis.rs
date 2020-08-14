@@ -1,4 +1,4 @@
-use crate::algebras::polyring::*;
+
 use crate::ideals::*;
 
 // use crate::algebras::EuclideanDomain;
@@ -135,28 +135,27 @@ impl<'a, P: FPolyRing> Poly<'a, P> {
             let lcm = self.lt().lcm(&rhs.lt());
             let a_newlead = lcm.euclid_div(&self.lt()).unwrap().0;
             let b_newlead = lcm.euclid_div(&rhs.lt()).unwrap().0;
-
             Some((self * a_newlead) - (rhs * b_newlead))
         }
     }
 
     /// Divides self by the vector of polynomial in the order they were given in
     /// This is an implementation of the algorithm given in CLO
-    pub fn divpolys(&self, f: &Vec<Self>) -> (Vec<Self>, Self) {
+    pub fn divpolys(&self, divisors: &Vec<Self>) -> (Vec<Self>, Self) {
         // Since we need to mutate self. There is a potential optimisation to be had by 
         // getting rid of this clone
         let mut p = self.clone();
 
         // Remainder and quotients accumulators
         let mut r = Poly::zero();
-        let mut q = vec![Poly::zero(); f.len()];
+        let mut q = vec![Poly::zero(); divisors.len()];
 
         'outer: while !p.is_zero() {
-            for i in 0..f.len() {
+            for i in 0..divisors.len() {
                 // Checks if the lead term of p is divisible by one of the values
-                let quo = p.lt().euclid_div(&f[i].lt()).unwrap().0;
+                let quo = p.lt().euclid_div(&divisors[i].lt()).unwrap().0;
                 if !quo.is_zero() {
-                    p = p - (&f[i] * quo.clone());
+                    p = p - (&divisors[i] * quo.clone());
                     q[i] = &q[i] + &Poly::from_terms(vec![quo], q[i].ring);
                     continue 'outer;
                 }
@@ -181,6 +180,8 @@ mod tests {
     #[test]
     fn division_test() {
         // Univariate
+        println!("1");
+
         let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
         let a = Poly::from_str(&ring, "3.0x^2 + 5.0x^98").unwrap();
         let b = Poly::from_str(&ring, "5.0x^6").unwrap();
@@ -189,14 +190,14 @@ mod tests {
         println!("r = {}", r);
 
         // Multivariate
-        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
-        let a = Poly::from_str(&ring, "3.0x^2y^6 + 5.0x^98y^2").unwrap();
-        let b = Poly::from_str(&ring, "5.0x^6").unwrap();
-        println!("a = {}", a);
-        println!("b = {}", b);
-        let (q, r) = a.divpolys(&vec![b]);
-        println!("q = {:?}", q);
-        println!("r = {}", r);
+        // let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
+        // let a = Poly::from_str(&ring, "3.0x^2y^6 + 5.0x^98y^2").unwrap();
+        // let b = Poly::from_str(&ring, "5.0x^6").unwrap();
+        // println!("a = {}", a);
+        // println!("b = {}", b);
+        // let (q, r) = a.divpolys(&vec![b]);
+        // println!("q = {:?}", q);
+        // println!("r = {}", r);
     }
 
     /// Tests the normal Buchberger's Algorithm
@@ -273,6 +274,7 @@ mod tests {
         let y = Poly::from_str(&ring, "1.0y^1").unwrap();
         let x_y_ideal = Ideal::new(vec![x, y]);
         assert!(x_y_ideal.is_groebner_basis());
+        println!("waypoint");
 
         let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
         let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();

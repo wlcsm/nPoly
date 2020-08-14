@@ -19,10 +19,53 @@ pub trait MyFromStr<'a, P: PolyRing>: Sized {
     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err>;
 }
 
+
+
+// TODO implement this
+// impl<'a, P: PolyRing> MyFromStr<'a, P> for Term<P> {
+//     type Err = PolyErr;
+
+//     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err> {
+
+//         let mono = String::new();
+//         let mono_named = String::new();
+
+//         // Build the named and unnamed regexes
+//         for s in ring.symb() {
+//             mono.push_str(&format!(r"({var}\^\d*)?", var = s));
+//             mono_named.push_str(&format!(r"(?:{var}\^(?P<{var}>\d*))?", var = s));
+//         }
+
+//         if !mono.is_match(s) {
+//             Err(PolyErr::ParsePolyError)
+//         } else {
+//             let mut acc = Vec::new();
+//             for caps in mono_named.captures_iter(s) {
+
+//                 // Extract the indices of the indeterminates in the term
+//                 let mut degrees = P::Mon::zero();
+//                 for (i, symb) in ring.symb().iter().enumerate() {
+//                     if let Some(n) = caps.name(symb.to_string().as_str()) {
+//                         degrees.set(
+//                             i,
+//                             n.as_str()
+//                                 .parse::<usize>()
+//                                 .map_err(|_| PolyErr::ParsePolyError)?,
+//                         );
+//                     }
+//                 }
+//                 acc.push(Monomial::new(degrees))
+//             }
+//             // println!("acc = {:?}", acc);
+//             Ok(Poly::<'a, P>::from_terms(acc, Some(ring)))
+//         }
+//     }
+// }
 impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
     type Err = PolyErr;
 
     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err> {
+
         // Build the named and unnamed regexes
         let mut mono = format!("{}", P::Coeff::REGEX);
         let mut mono_named = format!("(?P<coeff>{})", P::Coeff::REGEX);
@@ -44,6 +87,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
             let mut acc = Vec::new();
             for caps in term_regex.captures_iter(s) {
                 // Extract the coefficient, at the moment, it needs a 1 there
+                // println!("caps = {:?}", caps);
                 let mut coeff = caps["coeff"]
                     .parse::<P::Coeff>()
                     .map_err(|_| PolyErr::ParsePolyError)?;
@@ -65,9 +109,9 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
                         );
                     }
                 }
-
                 acc.push(Term::new(coeff, degrees))
             }
+            // println!("acc = {:?}", acc);
             Ok(Poly::<'a, P>::from_terms(acc, Some(ring)))
         }
     }
@@ -77,6 +121,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 mod tests {
     use super::*;
     use crate::algebras::integers::ZZ;
+    use crate::algebras::real::RR;
     use crate::polym::*;
     // use crate::polyu::*;
     use generic_array::typenum::U2;
@@ -89,10 +134,16 @@ mod tests {
         // println!("{:?}", a);
         // println!("{}", a);
 
+        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
+
+        let a = Poly::from_str(&ring, "1.0x^1y^1 + 2.0x^1").unwrap();
+
         // Multivariate
         let ring = PRDomain::<ZZ, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
         let a = Poly::from_str(&ring, "3x^2y^6 + 5x^98y^2").unwrap();
         let b = Poly::from_str(&ring, "5x^6").unwrap();
+        println!("a = {:?}", a);
+        println!("b = {:?}", b);
         println!("a = {}", a);
         println!("b = {}", b);
     }
