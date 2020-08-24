@@ -25,6 +25,7 @@ pub mod fast_mult;
 pub mod fft;
 pub mod ideals;
 pub mod mathutils;
+pub mod bench;
 pub mod parse;
 pub mod display;
 pub mod polym;

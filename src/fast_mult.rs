@@ -74,11 +74,10 @@ pub mod karatsuba {
 
     pub fn karatsuba<'a, P: PolyRingUni>(poly_a: &Poly<'a, P>, poly_b: &Poly<'a, P>) -> Poly<'a, P> {
 
-        let n_a = poly_a.deg().next_power_of_two();
-        let n_b = poly_b.deg().next_power_of_two();
+        let n = std::cmp::max(poly_a.deg().next_power_of_two(), poly_b.deg().next_power_of_two());
 
-        let sig_a = super::to_coeff_vec(&poly_a.terms, n_a);
-        let sig_b = super::to_coeff_vec(&poly_b.terms, n_b);
+        let sig_a = super::to_coeff_vec(&poly_a.terms, n);
+        let sig_b = super::to_coeff_vec(&poly_b.terms, n);
 
         let res = dense(&sig_a, &sig_b);
         Poly::from_coeff(poly_a.ring.unwrap(), res)
@@ -122,6 +121,7 @@ pub mod karatsuba {
         let (low_b, high_b) = arr_b.split_at(n / 2);
         
         let z0 = dense(low_a, low_b);
+
         let z1 = dense(&dense_add_slices(low_a, high_a)[..], &dense_add_slices(low_b, high_b)[..]);
         let z2 = dense(high_a, high_b);
 
@@ -150,50 +150,6 @@ pub mod karatsuba {
     fn dense_add_slices<'a, R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Vec<R> {
         izip!(arr_a.into_iter(), arr_b.into_iter()).map(|(a, b)| *a + *b).collect()
     }
-    // TODO Had some troubles
-    // fn sparse<'a, P: PolyRingUni>(arr_a: &[Term<P>], arr_b: &[Term<P>]) -> Vec<Term<P>> {
-
-    //     let n_a = arr_a.len();
-    //     let n_b = arr_b.len();
-
-    //     if (n_a <= 1) || (n_b <= 1) {
-    //         return match (n_a, n_b) {
-    //             (0, 0) => Vec::new(),
-    //             (1, 0) => arr_a.to_vec(),
-    //             (0, 1) => arr_b.to_vec(),
-    //             (1, 1) => vec![arr_a[0] * arr_b[0]],
-    //         }
-    //     }
-    
-    //     // Calculates where to split the polynomial at
-    //     let split_value = std::cmp::max(arr_a[n_a-1].mon.tot_deg(), arr_b[n_b-1].mon.tot_deg()) / 2;
-        
-    //     // Gets the digit to split the polynomials at
-    //     let split_index_a = split_at(arr_a, split_value);
-    //     let split_index_b = split_at(arr_b, split_value);
-
-    //     // Actually splits the polynomials
-    //     let (low_a, high_a) = arr_a.split_at(split_index_a);
-    //     let (low_b, high_b) = arr_b.split_at(split_index_b);
-        
-    //     // FIXME This line is a hack, I need a ring to make a polynomial so I can add them
-    //     // together. Maybe the add function should only be implemented on slices?
-    //     let ring = <P>::new(vec!['x']);
-
-    //     let z0 = Poly::from_terms( sparse(low_a, low_b), Some(&ring));
-    //     let z1 = Poly::from_terms( sparse(low_a + scale_down(high_a, split_value), low_b + scale_down(high_b, split_value)), Some(&ring));
-    //     let z2 = Poly::from_terms( sparse(high_a, high_b), Some(&ring));
-
-    //     z2 + z1 - scale_down(&z2[..], split_value) + scale_up(&z0[..], split_value) + z0
-            
-    // }
-
-    // fn scale_down<'a, P: PolyRingUni>(terms: &[Term<P>], deg: usize) -> Vec<Term<P>> {
-    //     terms.into_iter().map(|t| Term::new(t.coeff, UniIndex(t.mon.0 - deg))).collect()
-    // }
-    // fn scale_up<'a, P: PolyRingUni>(terms: &[Term<P>], deg: usize) -> Vec<Term<P>> {
-    //     terms.into_iter().map(|t| Term::new(t.coeff, UniIndex(t.mon.0 + deg))).collect()
-    // }
 
     #[cfg(test)]
     mod test {
@@ -208,7 +164,7 @@ pub mod karatsuba {
         fn karatsuba_mult_test() {
 
             let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
-            let a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5").unwrap();
+            let a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5 + 8.0x^10").unwrap();
             let b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
 
             let res = karatsuba(&a, &b);
@@ -216,12 +172,61 @@ pub mod karatsuba {
         }
 
         #[bench]
-        fn karatsuba_bench(b: &mut Bencher) {
+        fn karatsuba_bench_small(b: &mut Bencher) {
             let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
             let poly_a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5").unwrap();
             let poly_b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
 
             b.iter(|| karatsuba(&poly_a, &poly_b));
+        }
+
+        #[bench]
+        fn karatsuba_bench_medium(b: &mut Bencher) {
+            let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
+            let poly_a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5").unwrap();
+            let poly_b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
+
+            b.iter(|| karatsuba(&poly_a, &poly_b));
+        }
+
+        extern crate chrono;
+        extern crate rand;
+        use chrono::*;
+        use rand::distributions::{Distribution, Uniform};
+
+        #[test]
+        fn bench_dense_main() {
+            let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
+
+            // Note all coefficients are nonzero
+            let dist = Uniform::from(1..100);
+            let mut rng = rand::thread_rng();
+            // A function to randomly generate a polynomial with n coefficients
+            let mut make_poly = |n: usize| -> PolyU<RR> {
+                let res_vec = (0..n).map(|_| RR::from_int(dist.sample(&mut rng))).collect();
+                Poly::from_coeff(&ring, res_vec)
+            };
+
+            // Benches the time required to multiply two arbitrary polynomials of deg = n
+            let mut time_mult = |n: usize| {
+                let a = make_poly(n);
+                let b = make_poly(n);
+
+                println!("-------------------------------------------");
+                println!("Number of elements = {}", n);
+                println!("-------------------------------------------");
+                println!(
+                    "Karatsuba: {:?}",
+                    Duration::span(|| {
+                        karatsuba(&a, &b);
+                    })
+                );
+                println!("-------------------------------------------");
+            };
+
+            for i in 5..16 {
+                time_mult(1 << i);
+            }
         }
     }
 

@@ -525,11 +525,10 @@ impl<'a, P: PolyRing> Mul for Poly<'a, P> {
 
         for (a, b) in iproduct!(self.terms, rhs.terms) {
             // Inserts the value into the hashmap if empty, or adds it to the current value if not
-            let term = a * b;
-            let coeff = term.coeff;
-            res_hash.entry(term.mon)
-                .and_modify(|c| { *c += coeff })
-                .or_insert(coeff);
+            let Term { coeff: c, mon: m } = a * b;
+            res_hash.entry(m)
+                .and_modify(|v| { *v += c })
+                .or_insert(c);
         }
 
         let mut res_vec: Vec<Term<P>> = res_hash.into_iter().map(|(k, v)| Term::new(v, k)).collect();
@@ -568,6 +567,7 @@ mod tests {
 
         b.iter(|| poly_a.clone() * poly_b.clone());
     }
+
 }
 
 // impl<'a, P: PolyRing> MulAssign<Right=P::Coeff> for Poly<'a, P> {

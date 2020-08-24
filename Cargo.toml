@@ -22,3 +22,10 @@ nalgebra = "0.21"
 alga = "0.9.3"
 alga_derive = "0.9.2"
 impl_ops = "0.1.1"
+
+# [dev-dependencies] */
+# criterion = "0.3" */
+#
+# [[bench]] */
+# name = "my_benchmark" */
+# harness = false */

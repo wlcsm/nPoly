@@ -11,6 +11,17 @@ impl PartialEq for RR {
     }
 }
 
+impl RR {
+    pub fn new(n: f64) -> RR {
+        RR(n)
+    }
+    /// TODO: Error checking?
+    pub fn from_int(n: usize) -> RR {
+        RR(n as f64)
+    }
+}
+
+
 impl_zero![RR, f64];
 impl_one![RR, f64];
 
