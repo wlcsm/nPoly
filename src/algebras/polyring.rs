@@ -428,7 +428,20 @@ impl<'a, P: PolyRing> Zero for Poly<'a, P> {
     }
 }
 
-use crate::fast_mult::to_coeff_vec;
+
+/// Expands the input into a coefficient vector padded with zeros to length n
+pub fn to_coeff_vec<P: PolyRing>(input: &[Term<P>], n: usize) -> Vec<P::Coeff> {
+
+    let mut result: Vec<P::Coeff> = Vec::with_capacity(n);
+    for Term { coeff, mon } in input.iter() {
+        // Fill the gap between monomials with zeros, then add the monomial
+        result.resize(mon.tot_deg(), <P::Coeff>::zero());
+        result.push(*coeff);
+    }
+    // Pad the rest
+    result.resize(n, <P::Coeff>::zero());
+    result
+}
 
 impl<R: ScalarRing> Mul for DenseVec<R> {
     type Output = Self;
@@ -458,55 +471,6 @@ impl<R: ScalarRing> Mul for DenseVec<R> {
     }
 }
 
-use generic_array::typenum::U1;
-
-/// Expands the input into a coefficient vector padded with zeros to length "size"
-/// The "size" parameter will pad the vector with zeros until the total vector has length at least
-/// that size. If size is less than the length of the vector it will do nothing.
-/// If None is give, it will do no padding
-fn to_coeffvec<P: PolyRing>(input: &[Term<P>], size: Option<usize>) -> DenseVec<P::Coeff> {
-
-    if P::NumVar::to_usize() != U1::to_usize() {
-        panic!("Haven't implemented Kronecker substitution yet")
-    }
-
-    let allocate = if let Some(n) = size {n} else {input.last().unwrap().mon.tot_deg()};
-
-    let mut result: Vec<P::Coeff> = Vec::with_capacity(allocate);
-
-    for Term { coeff, mon } in input.iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(mon.tot_deg(), <P::Coeff>::zero());
-        result.push(*coeff);
-    }
-    // Pad the rest
-    if let Some(n) = size {
-        result.resize(n, <P::Coeff>::zero());
-    }
-    DenseVec(result)
-}
-
-
-/// This will be used to hold the data to perform Kronecker substitution
-struct Kronecker_Data<N: VarNumber>(GenericArray<usize, N>);
-
-fn to_sparse_vec<P: PolyRing>(input: &DenseVec<P::Coeff>, kron_data: Option<Kronecker_Data<P::NumVar>>) -> Vec<Term<P>> {
-
-    unimplemented!()
-    // match kron_data {
-    //     Some(_) => panic!("Can't do Kronecker substitution yet"),
-    //     None    => {
-    //         let terms = input.0
-    //             .into_iter()
-    //             .enumerate()
-    //             .filter(|(_, c)| !c.is_zero())
-    //             .map(|(i, c)| Term::new(c, UniIndex(i)))
-    //             .collect();
-
-    //         Poly::from_terms_unchecked(terms, Some(ring))
-    //     }
-    // }
-}
 
 
 use std::collections::HashMap;

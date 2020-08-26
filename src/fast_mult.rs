@@ -1,47 +1,14 @@
 
 use crate::algebras::polyring::*;
-// use crate::algebras::*;
 use crate::fft::*;
 use crate::mathutils::log2_unchecked;
-// use crate::polyu::*;
+use crate::polyu::*;
 
+/// Defines a fast multiplication function that can be used to multiply polynomials asymptotically
+/// quicker than the standard schoolbook algorithm that is implemented for all polynomials
 pub trait FastMult {
     fn fast_mult(&self, b: &Self) -> Self;
 }
-
-// // TODO these two should also be a macro
-// fn to_coeff_vec_complex(input: &Vec<Term<ZZ>>, n: usize) -> Vec<CC> {
-//     // Expands the input into the expanded coefficient vector (coerced into complex)
-//     // Then padded with zeros to length n
-
-//     let mut result: Vec<CC> = Vec::with_capacity(n);
-//     for Term { coeff, deg } in input {
-//         // Fill the gap between monomials with zeros, then add the monomial
-//         result.resize(deg.0 as usize, CC::zero());
-//         result.push(CC::from_re(coeff.0));
-//     }
-//     // Pad the rest
-//     result.resize(n, CC::zero());
-//     result
-// }
-
-use num_traits::Zero;
-
-/// Expands the input into a coefficient vector padded with zeros to length n
-pub fn to_coeff_vec<P: PolyRing>(input: &[Term<P>], n: usize) -> Vec<P::Coeff> {
-
-    let mut result: Vec<P::Coeff> = Vec::with_capacity(n);
-    for Term { coeff, mon } in input.iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(mon.tot_deg(), <P::Coeff>::zero());
-        result.push(*coeff);
-    }
-    // Pad the rest
-    result.resize(n, <P::Coeff>::zero());
-    result
-}
-
-use crate::polyu::*;
 
 impl<'a, T: SupportsFFT> FastMult for PolyU<'a, T> {
     // FFT Multiplication
@@ -74,7 +41,8 @@ pub mod karatsuba {
 
     pub fn karatsuba<'a, P: PolyRingUni>(poly_a: &Poly<'a, P>, poly_b: &Poly<'a, P>) -> Poly<'a, P> {
 
-        let n = std::cmp::max(poly_a.deg().next_power_of_two(), poly_b.deg().next_power_of_two());
+        //  Pad to the nearest power of two
+        let n = (std::cmp::max(poly_a.deg(), poly_b.deg()) + 1).next_power_of_two();
 
         let sig_a = super::to_coeff_vec(&poly_a.terms, n);
         let sig_b = super::to_coeff_vec(&poly_b.terms, n);
@@ -156,122 +124,53 @@ pub mod karatsuba {
         extern crate test;
         use crate::algebras::real::RR;
         use super::*;
-        use crate::polyu::UniVarOrder;
-        use crate::parse::*;
-        use test::Bencher;
-
-        #[test]
-        fn karatsuba_mult_test() {
-
-            let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
-            let a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5 + 8.0x^10").unwrap();
-            let b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
-
-            let res = karatsuba(&a, &b);
-            println!("{}", res)
-        }
-
-        #[bench]
-        fn karatsuba_bench_small(b: &mut Bencher) {
-            let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
-            let poly_a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5").unwrap();
-            let poly_b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
-
-            b.iter(|| karatsuba(&poly_a, &poly_b));
-        }
-
-        #[bench]
-        fn karatsuba_bench_medium(b: &mut Bencher) {
-            let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
-            let poly_a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5").unwrap();
-            let poly_b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
-
-            b.iter(|| karatsuba(&poly_a, &poly_b));
-        }
-
-        extern crate chrono;
-        extern crate rand;
         use chrono::*;
-        use rand::distributions::{Distribution, Uniform};
+        use crate::bench::*;
+        use crate::polyu::UniVarOrder;
+        use rand::distributions::uniform::UniformSampler;
+
 
         #[test]
-        fn bench_dense_main() {
+        fn karatsuba_small_test() {
+            let res = karatsuba_tester(vec![2, 10, 40]);
+            for (size, time) in res {
+                println!("Karatsuba's algorithm took {} to multiply polynomials of degree {}", time, size)
+            }
+        }
+
+        #[test]
+        fn karatsuba_medium_test() {
+            let res = karatsuba_tester(vec![1 << 7, 1 << 8, 1 << 9]);
+            for (size, time) in res {
+                println!("Karatsuba's algorithm took {} to multiply polynomials of degree {}", time, size)
+            }
+        }
+
+        /// Takes a vector of usize and then generates two polynomials of that size and multiplies
+        /// them with Karatsuba's algorithm. Returns vector containing the original argument and
+        /// the duration of the multiplication in a tuple
+        fn karatsuba_tester(test_sizes: Vec<usize>) -> Vec<(usize, Duration)> {
+
             let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
 
-            // Note all coefficients are nonzero
-            let dist = Uniform::from(1..100);
             let mut rng = rand::thread_rng();
+            let dist = MyUniformDistRR::new(RR(-10.0), RR(10.0));
+
             // A function to randomly generate a polynomial with n coefficients
             let mut make_poly = |n: usize| -> PolyU<RR> {
-                let res_vec = (0..n).map(|_| RR::from_int(dist.sample(&mut rng))).collect();
+                let res_vec = (0..n).map(|_| dist.sample(&mut rng)).collect();
                 Poly::from_coeff(&ring, res_vec)
             };
 
-            // Benches the time required to multiply two arbitrary polynomials of deg = n
-            let mut time_mult = |n: usize| {
-                let a = make_poly(n);
-                let b = make_poly(n);
+            test_sizes.into_iter().map(|size| {
+                let execution_time = {
+                    let a = make_poly(size);
+                    let b = make_poly(size);
 
-                println!("-------------------------------------------");
-                println!("Number of elements = {}", n);
-                println!("-------------------------------------------");
-                println!(
-                    "Karatsuba: {:?}",
-                    Duration::span(|| {
-                        karatsuba(&a, &b);
-                    })
-                );
-                println!("-------------------------------------------");
-            };
-
-            for i in 5..16 {
-                time_mult(1 << i);
-            }
+                    Duration::span(|| { karatsuba(&a, &b); })
+                };
+                (size, execution_time)
+            }).collect()
         }
     }
-
-
 }
-
-// impl<'a, P: PolyRing<Var=U1>> FastMult for Poly<'a, P> {
-//     fn fast_mult(&self, other: &Self) -> Self {
-//         let n = (self.deg() + other.deg() + 1).next_power_of_two();
-//         let mut a_sig = to_coeff_vec(&self.terms, n);
-//         let mut b_sig = to_coeff_vec(&other.terms, n);
-
-//         // Infix on a_sig
-//         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
-
-//         // Need to normalise it here
-//         for x in a_sig.iter_mut() {
-//             x.divby2(log2_unchecked(n))
-//         }
-
-//         // Convert back into polynomial type
-//         Poly::from_coeff(self.ring, a_sig)
-//     }
-// }
-// Frozen this at the moment becaue it requires a change of type from CC to ZZ
-// which I don't feel like doing at the moment
-
-// impl<'a, P: PolyRing<Coeff=CC, Var=Univariate>> FastMult for Poly<'a, P> {
-
-//     fn fast_mult(&self, other: &Self) -> Self {
-
-//         let n = (self.deg() + other.deg() + 1).next_power_of_two();
-//         let mut a_sig = to_coeff_vec_complex(&self.terms, n);
-//         let mut b_sig = to_coeff_vec_complex(&other.terms, n);
-
-//         eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
-
-//         // Because we converted it to complex for the ROU
-//         // We also need to normalise it here
-//         let c_parsed = a_sig.into_iter()
-//                             .map(|x|
-//                                 ZZ((x.0 / n as f64).re.round() as i32)
-//                             ).collect();
-
-//         // Convert back into polynomial type
-//         Poly::from_coeff(self.ring, c_parsed)
-//     }
-// }
