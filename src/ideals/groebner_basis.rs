@@ -1,4 +1,3 @@
-
 use crate::ideals::*;
 
 // use crate::algebras::EuclideanDomain;
@@ -16,8 +15,8 @@ use crate::ideals::*;
 // impl<I: Iterator + Clone> Unord<I> {
 //     fn new(iter: I) -> Unord<I> {
 //         let el = iter.next();
-//         Unord { 
-//             first: iter, 
+//         Unord {
+//             first: iter,
 //             second: iter.clone(),
 //             curr_el: el,
 //         }
@@ -37,18 +36,17 @@ use crate::ideals::*;
 //                 None => (None, None),
 //                 Some(a) => {
 //                     self.curr_el = self.first.next();
-//                     self.sec = 
+//                     self.sec =
 //                     (a, b)
 //                 }
 //             }
 //         }
 //     }
 // }
-
 use num_traits::Zero;
 
 impl<'a, P: FPolyRing> Ideal<'a, P> {
-    /// Standard implementation of Buchberger's Criterion to check if a 
+    /// Standard implementation of Buchberger's Criterion to check if a
     /// basis is a Groebner Basis
     pub fn is_groebner_basis(&self) -> bool {
         let n = self.gens.len();
@@ -75,7 +73,7 @@ impl<'a, P: FPolyRing> Ideal<'a, P> {
                     // need to check
                     if let Some(_) = gb.add(r) {
                         n += 1;
-                        new_pairs.append(&mut (0..n - 1).map(|k| (k, n-1)).collect());
+                        new_pairs.append(&mut (0..n - 1).map(|k| (k, n - 1)).collect());
                     }
                 }
             }
@@ -84,10 +82,10 @@ impl<'a, P: FPolyRing> Ideal<'a, P> {
         gb
     }
 
-//     /// Implementation of the Improved Buchberger's algorithm found at the end of
-//     /// "Ideals, Varieties, and Algorithms" by Cox, Little, and O'Shea 4th edition.
-//     /// Not fully implemented, the trick from Proposition 3 hasn't yet been implemented as it is
-//     /// non-trivial
+    //     /// Implementation of the Improved Buchberger's algorithm found at the end of
+    //     /// "Ideals, Varieties, and Algorithms" by Cox, Little, and O'Shea 4th edition.
+    //     /// Not fully implemented, the trick from Proposition 3 hasn't yet been implemented as it is
+    //     /// non-trivial
     // pub fn bb_algorithm_impr(&self) -> Self {
     //     let mut gb = self.clone();
     //     let mut n = gb.gens.len();
@@ -119,10 +117,9 @@ fn unord_pairs_int(n: usize) -> Vec<(usize, usize)> {
     iproduct!((0..n), (0..n)).filter(|(i, j)| i >= j).collect()
 }
 
-
 impl<'a, P: FPolyRing> Poly<'a, P> {
     /// The remainder upon division by the polynomials in "g".
-    /// Note: If "g" is not a Groebner basis then this can produce unpredictable 
+    /// Note: If "g" is not a Groebner basis then this can produce unpredictable
     /// results
     fn reduce(&self, g: &Ideal<'a, P>) -> Self {
         self.divpolys(&g.gens).1
@@ -142,7 +139,7 @@ impl<'a, P: FPolyRing> Poly<'a, P> {
     /// Divides self by the vector of polynomial in the order they were given in
     /// This is an implementation of the algorithm given in CLO
     pub fn divpolys(&self, divisors: &Vec<Self>) -> (Vec<Self>, Self) {
-        // Since we need to mutate self. There is a potential optimisation to be had by 
+        // Since we need to mutate self. There is a potential optimisation to be had by
         // getting rid of this clone
         let mut p = self.clone();
 
@@ -210,7 +207,6 @@ mod tests {
         assert!(r.is_groebner_basis());
     }
 
-
     use chrono::*;
     use typenum::U3;
 
@@ -220,24 +216,28 @@ mod tests {
         let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
         let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
         let r = &Ideal::new(vec![a, b]);
-        println!("BB Alg time = {:?}", 
+        println!(
+            "BB Alg time = {:?}",
             Duration::span(|| {
                 r.bb_algorithm();
-            }));
+            })
+        );
 
         let ring = PRDomain::<RR, GLex<MultiIndex<U3>>>::new(vec!['x', 'y', 'z']);
         let f_vec = vec![
-                Poly::from_str(&ring, "1.0x^2 + 1.0x^1y^1 - 1.0").unwrap(),
-                Poly::from_str(&ring, "1.0x^2 - 1.0z^2").unwrap(),
-                Poly::from_str(&ring, "1.0x^1y^1 + 1.0").unwrap(),
-            ];
+            Poly::from_str(&ring, "1.0x^2 + 1.0x^1y^1 - 1.0").unwrap(),
+            Poly::from_str(&ring, "1.0x^2 - 1.0z^2").unwrap(),
+            Poly::from_str(&ring, "1.0x^1y^1 + 1.0").unwrap(),
+        ];
 
         let ideal = Ideal::new(f_vec);
 
-        println!("BB Alg time = {:?}", 
+        println!(
+            "BB Alg time = {:?}",
             Duration::span(|| {
                 ideal.bb_algorithm();
-            }));
+            })
+        );
     }
 
     // #[test]
@@ -246,7 +246,7 @@ mod tests {
     //     let a = Poly::from_str(&ring, "1.0x^3 - 2.0x^1y^1").unwrap();
     //     let b = Poly::from_str(&ring, "1.0x^2y^1 - 2.0y^2 + 1.0x^1").unwrap();
     //     let r = &Ideal::new(vec![a, b]);
-    //     println!("BB Alg time = {:?}", 
+    //     println!("BB Alg time = {:?}",
     //         Duration::span(|| {
     //             r.bb_algorithm_impr();
     //         }));
@@ -260,7 +260,7 @@ mod tests {
 
     //     let ideal = Ideal::new(f_vec);
 
-    //     println!("BB Alg time = {:?}", 
+    //     println!("BB Alg time = {:?}",
     //         Duration::span(|| {
     //             ideal.bb_algorithm_impr();
     //         }));

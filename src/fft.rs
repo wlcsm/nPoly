@@ -101,7 +101,7 @@ pub fn go_fast<F: SupportsFFT>(sig: &mut [F], inv: bool) {
         // Iterate over all the flutters, j is their starting index
         for j in (0..n).step_by(flut) {
             // Width of the k-flutter (number of elements)
-            for k in j .. (j + (flut / 2)) {
+            for k in j..(j + (flut / 2)) {
                 let l = k + flut / 2;
                 let a = sig[k];
                 let rou_b = rou[(k % flut) * (n >> i)] * sig[l]; // w^j * b
@@ -123,7 +123,21 @@ mod tests {
     use crate::polyu::*;
     use chrono::*;
 
+    use super::perform_fft;
     use rand::distributions::{Distribution, Uniform};
+
+    #[test]
+    fn fft_test() {
+        let mut sig = vec![
+            CC::from_re(9),
+            CC::from_re(3),
+            CC::from_re(3),
+            CC::from_re(6),
+        ];
+        let _ = perform_fft(&mut sig[..], false);
+
+        println!("{:?}", sig)
+    }
 
     // TODO I'm not sure this is correctly working, I changed the =log2_unchecked to log2_unchecked
     #[test]

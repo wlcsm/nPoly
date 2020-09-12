@@ -1,5 +1,5 @@
 use crate::algebras::*;
-use crate::{impl_zero, impl_one};
+use crate::{impl_one, impl_zero};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RR(pub f64);
@@ -21,18 +21,16 @@ impl RR {
     }
 }
 
-
 impl_zero![RR, f64];
 impl_one![RR, f64];
-
 
 use std::ops;
 
 impl_op_ex!(-|a: &RR| -> RR { RR(-a.0) });
 
 impl_op_ex!(+ |a: &RR, b: &RR| -> RR { RR(a.0 + b.0) });
-impl_op_ex!(- |a: &RR, b: &RR| -> RR { RR(a.0 - b.0) });
-impl_op_ex!(* |a: &RR, b: &RR| -> RR { RR(a.0 * b.0) });
+impl_op_ex!(-|a: &RR, b: &RR| -> RR { RR(a.0 - b.0) });
+impl_op_ex!(*|a: &RR, b: &RR| -> RR { RR(a.0 * b.0) });
 impl_op_ex!(/ |a: &RR, b: &RR| -> RR { RR(a.0 / b.0) });
 
 impl_op_ex!(+= |a: &mut RR, b: &RR| { a.0 += b.0 });

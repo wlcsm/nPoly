@@ -1,7 +1,7 @@
 extern crate num_complex;
 
-use crate::{impl_zero, impl_one};
 use crate::algebras::*;
+use crate::{impl_one, impl_zero};
 use num_complex::Complex64;
 use std::ops;
 
@@ -22,8 +22,8 @@ impl_one![CC, Complex64];
 impl_op_ex!(-|a: &CC| -> CC { CC(-a.0) });
 
 impl_op_ex!(+ |a: &CC, b: &CC| -> CC { CC(a.0 + b.0) });
-impl_op_ex!(- |a: &CC, b: &CC| -> CC { CC(a.0 - b.0) });
-impl_op_ex!(* |a: &CC, b: &CC| -> CC { CC(a.0 * b.0) });
+impl_op_ex!(-|a: &CC, b: &CC| -> CC { CC(a.0 - b.0) });
+impl_op_ex!(*|a: &CC, b: &CC| -> CC { CC(a.0 * b.0) });
 impl_op_ex!(/ |a: &CC, b: &CC| -> CC { CC(a.0 / b.0) });
 
 impl_op_ex!(+= |a: &mut CC, b: &CC| { a.0 += b.0 });
@@ -90,7 +90,6 @@ impl fmt::Display for CC {
         write!(f, "{}", self.0)
     }
 }
-
 
 use crate::fft::SupportsFFT;
 use std::f64::consts::PI;

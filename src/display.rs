@@ -1,14 +1,14 @@
 use crate::algebras::polyring::*;
 
 pub fn show_vec_poly<'a, P: PolyRing>(poly: &Vec<Poly<'a, P>>) -> String {
-    format!("[\n {} \n ]",
+    format!(
+        "[\n {} \n ]",
         poly.iter()
             .map(|p| format!("{}", p))
             .collect::<Vec<String>>()
             .join("\n")
-        )
+    )
 }
-
 
 pub fn show_term<'a, P: PolyRing>(term: &Term<P>, ring: &Option<&P>) -> String {
     let mut acc = term.coeff.to_string();

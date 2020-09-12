@@ -2,7 +2,6 @@
 ///
 /// Most importantly it defines the MultiIndex struct which holds terms with multiple
 /// indeterminates
-
 use crate::algebras::polyring::*;
 use crate::algebras::*;
 use generic_array::*;
@@ -19,21 +18,21 @@ pub struct MultiIndex<N: VarNumber> {
     indices: GenericArray<usize, N>,
 }
 
-impl<N:VarNumber> PartialEq for MultiIndex<N> {
+impl<N: VarNumber> PartialEq for MultiIndex<N> {
     // First checks the total, then if it is true, checks the rest of the indices
     fn eq(&self, other: &Self) -> bool {
         self.total == other.total && self.indices == other.indices
     }
 }
-impl<N:VarNumber> Eq for MultiIndex<N> {}
+impl<N: VarNumber> Eq for MultiIndex<N> {}
 
 /// Constructor
-impl<N:VarNumber> MultiIndex<N> {
+impl<N: VarNumber> MultiIndex<N> {
     fn new(indices: GenericArray<usize, N>) -> Self {
         MultiIndex {
             total: indices.iter().sum(),
             indices,
-       }
+        }
     }
 }
 
@@ -57,22 +56,24 @@ pub struct Lex();
 
 use std::cmp::{max, min};
 
-impl<N:VarNumber> ClosedAdd for MultiIndex<N> {}
+impl<N: VarNumber> ClosedAdd for MultiIndex<N> {}
 
-pub fn binary_monomial_map<N: VarNumber>(lhs: &MultiIndex<N>, 
-                                rhs: &MultiIndex<N>, 
-                                map: fn(usize, usize) -> usize) -> MultiIndex<N> {
+pub fn binary_monomial_map<N: VarNumber>(
+    lhs: &MultiIndex<N>,
+    rhs: &MultiIndex<N>,
+    map: fn(usize, usize) -> usize,
+) -> MultiIndex<N> {
     MultiIndex::new(
         lhs.indices
             .iter()
             .zip(rhs.indices.iter())
             .map(|(a, b)| map(*a, *b))
-            .collect()
+            .collect(),
     )
 }
 
 use std::ops::{Add, AddAssign};
-impl<N:VarNumber> Add for MultiIndex<N> {
+impl<N: VarNumber> Add for MultiIndex<N> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
@@ -81,7 +82,7 @@ impl<N:VarNumber> Add for MultiIndex<N> {
 }
 
 use num_traits::Zero;
-impl<N:VarNumber> Zero for MultiIndex<N> {
+impl<N: VarNumber> Zero for MultiIndex<N> {
     fn zero() -> Self {
         Self::new(GenericArray::default())
     }
@@ -90,7 +91,7 @@ impl<N:VarNumber> Zero for MultiIndex<N> {
     }
 }
 
-impl<N:VarNumber> AddAssign<Self> for MultiIndex<N> {
+impl<N: VarNumber> AddAssign<Self> for MultiIndex<N> {
     fn add_assign(&mut self, other: Self) {
         for (a, b) in self.indices.iter_mut().zip(other.indices.iter()) {
             *a += b
@@ -98,15 +99,35 @@ impl<N:VarNumber> AddAssign<Self> for MultiIndex<N> {
     }
 }
 
-impl<N:VarNumber> MyAddMonoid for MultiIndex<N> {
+impl<N: VarNumber> MyAddMonoid for MultiIndex<N> {
     fn ref_add(&self, other: &Self) -> Self {
         binary_monomial_map(self, other, |a, b| a + b)
     }
 }
 
+impl<N: VarNumber> IntoIterator for MultiIndex<N> {
+    type Item = usize;
+    type IntoIter = GenericArrayIter<usize, N>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.indices.into_iter()
+    }
+}
+
+use std::iter::Iterator;
+
+impl<N: VarNumber> std::iter::FromIterator<usize> for MultiIndex<N> {
+    fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Self {
+        let indices_arr: GenericArray<usize, N> = iter.into_iter().collect();
+
+        MultiIndex {
+            total: indices_arr.iter().fold(0, |acc, a| acc + a),
+            indices: indices_arr,
+        }
+    }
+}
 
 impl<N: VarNumber> Monomial for MultiIndex<N> {
-    
     type NumVar = N;
 
     fn tot_deg(&self) -> usize {
@@ -140,15 +161,16 @@ impl<N: VarNumber> Monomial for MultiIndex<N> {
     }
 
     /// The find map short-circuits when the two indices are not equal.
-    /// If they are all equal then it returns None, in which case we 
+    /// If they are all equal then it returns None, in which case we
     /// use a "map_or" to convert the None into a Ordering::Equal
     fn lex(&self, other: &Self) -> Ordering {
-        izip!(&self.indices, &other.indices).find_map(|(a, b)| 
-            match a.cmp(&b) {
-                Ordering::Equal => None,
-                ord             => Some(ord)
-            })
-            .map_or(Ordering::Equal , |ord| {ord})
+        self.indices.cmp(&other.indices)
+        // izip!(&self.indices, &other.indices).find_map(|(a, b)|
+        //     match a.cmp(&b) {
+        //         Ordering::Equal => None,
+        //         ord             => Some(ord)
+        //     })
+        //     .map_or(Ordering::Equal , |ord| {ord})
     }
 
     fn gcd(&self, other: &Self) -> Self {
@@ -159,8 +181,8 @@ impl<N: VarNumber> Monomial for MultiIndex<N> {
     }
 }
 
-use std::fmt;
 use crate::display::*;
+use std::fmt;
 
 // Problem is that it's hard to put an ordering on the coefficients because in finite fields
 // thats quite ambiguous. I need it in the "if x < 0" line
@@ -180,31 +202,5 @@ impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
 
             write!(f, "{}", acc)
         }
-    }
-}
-
-mod kronecker {
-    use generic_array::typenum::U1;
-    use super::*;
-
-    /// This will be used to hold the data to perform Kronecker substitution
-    struct Kronecker_Data<N: VarNumber>(GenericArray<usize, N>);
-
-    fn to_sparse_vec<P: PolyRing>(input: &DenseVec<P::Coeff>, kron_data: Option<Kronecker_Data<P::NumVar>>) -> Vec<Term<P>> {
-
-        unimplemented!()
-        // match kron_data {
-        //     Some(_) => panic!("Can't do Kronecker substitution yet"),
-        //     None    => {
-        //         let terms = input.0
-        //             .into_iter()
-        //             .enumerate()
-        //             .filter(|(_, c)| !c.is_zero())
-        //             .map(|(i, c)| Term::new(c, UniIndex(i)))
-        //             .collect();
-
-        //         Poly::from_terms_unchecked(terms, Some(ring))
-        //     }
-        // }
     }
 }

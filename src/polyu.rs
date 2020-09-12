@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 // Shorthand
 pub type PolyU<'a, R> = Poly<'a, PRDomain<R, UniVarOrder>>;
 
-pub trait PolyRingUni: PolyRing<NumVar=U1,Ord=UniVarOrder, Mon=UniIndex> {}
+pub trait PolyRingUni: PolyRing<NumVar = U1, Ord = UniVarOrder, Mon = UniIndex> {}
 
 impl<R: ScalarRing> PolyRingUni for PRDomain<R, UniVarOrder> {}
 
@@ -21,9 +21,25 @@ impl MonOrd for UniVarOrder {
     }
 }
 
+impl std::iter::FromIterator<usize> for UniIndex {
+    fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Self {
+        UniIndex(iter.into_iter().next().unwrap())
+    }
+}
+
+use generic_array::GenericArrayIter;
+
+impl IntoIterator for UniIndex {
+    type Item = usize;
+    type IntoIter = GenericArrayIter<usize, typenum::U1>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unimplemented!()
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd, Hash)]
 pub struct UniIndex(pub(crate) usize);
-
 
 impl Zero for UniIndex {
     fn zero() -> Self {
@@ -53,7 +69,6 @@ use typenum::U1;
 impl VarNumber for U1 {}
 
 impl Monomial for UniIndex {
-
     type NumVar = U1;
 
     // TODO These get and set are not good and I should look for a way around this
@@ -137,7 +152,6 @@ impl<'a, F: ScalarField> PolyU<'a, F> {
         Poly::from_coeff(self.ring.unwrap(), acc)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,5 +1,5 @@
-use crate::algebras::*;
 use crate::algebras::polyring::*;
+use crate::algebras::*;
 use num_traits::Zero;
 
 pub mod f4;
@@ -12,8 +12,8 @@ pub struct Ideal<'a, P: PolyRing> {
 
 impl<'a, P: PolyRing> Ideal<'a, P> {
     pub fn new(gens: Vec<Poly<'a, P>>) -> Self {
-        Ideal { 
-            gens: gens.into_iter().filter(|t| !t.is_zero()).collect()
+        Ideal {
+            gens: gens.into_iter().filter(|t| !t.is_zero()).collect(),
         }
     }
     /// Returns a reference to the item if it was successfully added
@@ -35,15 +35,17 @@ use std::fmt;
 
 impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ideal (\n {} )", 
-            self.gens.iter()
+        write!(
+            f,
+            "Ideal (\n {} )",
+            self.gens
+                .iter()
                 .map(|p| format!("{}", p))
                 .collect::<Vec<String>>()
                 .join("\n")
         )
     }
 }
-
 
 // Want to take ownership so that the ideal doesn't change.
 // If you want the ideal again then you need to get it from the destructor
@@ -52,32 +54,6 @@ pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
     gens: Vec<P::Mon>,
     original: Option<&'b Ideal<'a, P>>,
 }
-
-// Should return the minimum generating set of monomials
-fn simplify<P: PolyRing>(input: Vec<P::Mon>) -> Vec<P::Mon> {
-
-    unimplemented!()
-    // let n = input.len();
-    // let res = Vec::with_capacity(n);
-    // for i in 0..n {
-    //     let is_minimal = 0..n.filter(|k| k != i).all(|j| !input[i].divides(input[j]).unwrap());
-
-    //     if is_minimal {
-    //         res.push(input[i])
-    //     }
-    // }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn is_simplified() {
-
-        // let mon_ideal = MonomialIdeal::new(Monomial
-
-    }
-}
-
 
 impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
     pub fn new(gens: Vec<P::Mon>) -> Self {
@@ -111,16 +87,13 @@ impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
         match self.original {
             Some(ideal) => {
                 for (lm, poly) in izip!(self.gens.iter(), ideal.gens.iter()) {
-                    // println!("lm = {:?}", lm);
-                    // println!("term = {:?}", term);
-                    // println!("poly = {}", poly);
                     if term.divides(lm).unwrap() {
                         return Some(&poly);
                     }
                 }
                 None
-            },
-            None => None
+            }
+            None => None,
         }
     }
 }

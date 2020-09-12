@@ -5,8 +5,8 @@ pub mod polyring;
 pub mod real;
 // use alga::general::{Ring, Field, Operator, Additive, Multiplicative};
 use num_traits::{One, Zero};
-use std::ops::{Add, Mul, Sub, Neg, Div};
 use std::fmt::Debug;
+use std::ops::{Add, Div, Mul, Neg, Sub};
 
 /// Alga package doesn't quite work for me because I need operations to
 /// work when taking ownership or references
@@ -42,7 +42,7 @@ pub trait MyAddGroup: MyAddMonoid + Neg<Output = Self> + Sub<Output = Self> {
     fn ref_sub(&self, other: &Self) -> Self;
 }
 
-impl<M: Copy + MyAddMonoid + Sub<Output=Self> + Neg<Output=Self>> MyAddGroup for M {
+impl<M: Copy + MyAddMonoid + Sub<Output = Self> + Neg<Output = Self>> MyAddGroup for M {
     fn ref_sub(&self, other: &Self) -> Self {
         *self - *other
     }
@@ -52,7 +52,7 @@ pub trait MyMulGroup: MyMulMonoid + Div<Output = Self> {
     fn ref_div(&self, other: &Self) -> Self;
 }
 
-impl<M: Copy + MyMulMonoid + Div<Output=Self>> MyMulGroup for M {
+impl<M: Copy + MyMulMonoid + Div<Output = Self>> MyMulGroup for M {
     fn ref_div(&self, other: &Self) -> Self {
         *self / *other
     }
@@ -60,7 +60,7 @@ impl<M: Copy + MyMulMonoid + Div<Output=Self>> MyMulGroup for M {
 
 #[macro_export]
 macro_rules! impl_zero {
-    ($name:ident, $inner:ty) => (
+    ($name:ident, $inner:ty) => {
         impl Zero for $name {
             #[inline]
             fn zero() -> Self {
@@ -71,18 +71,18 @@ macro_rules! impl_zero {
                 self.0.is_zero()
             }
         }
-    )
+    };
 }
 #[macro_export]
 macro_rules! impl_one {
-    ($name:ident, $inner:ty) => (
+    ($name:ident, $inner:ty) => {
         impl One for $name {
             #[inline]
             fn one() -> Self {
                 $name(<$inner>::one())
             }
         }
-    )
+    };
 }
 
 use std::ops::*;
@@ -110,6 +110,7 @@ pub trait MyField: MyRing + MyMulGroup {}
 pub trait ScalarField: MyField + ScalarRing + DivAssign<Self> {}
 
 pub trait EuclidDiv: MyMulMonoid {
+    /// In the form: self / other = Some(Quotient, Remainder)
     fn euclid_div(&self, other: &Self) -> Option<(Self, Self)>;
 }
 

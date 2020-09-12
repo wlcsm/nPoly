@@ -20,14 +20,14 @@ extern crate impl_ops;
 
 pub mod algebras;
 
+pub mod bench;
+pub mod display;
 pub mod error;
 pub mod fast_mult;
 pub mod fft;
 pub mod ideals;
 pub mod mathutils;
-pub mod bench;
 pub mod parse;
-pub mod display;
 pub mod polym;
 pub mod polyu;
 // pub mod sparse;

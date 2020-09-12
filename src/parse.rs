@@ -19,8 +19,6 @@ pub trait MyFromStr<'a, P: PolyRing>: Sized {
     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err>;
 }
 
-
-
 // TODO implement this
 // impl<'a, P: PolyRing> MyFromStr<'a, P> for Term<P> {
 //     type Err = PolyErr;
@@ -65,7 +63,6 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
     type Err = PolyErr;
 
     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err> {
-
         // Build the named and unnamed regexes
         let mut mono = format!("{}", P::Coeff::REGEX);
         let mut mono_named = format!("(?P<coeff>{})", P::Coeff::REGEX);
@@ -121,7 +118,6 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 mod tests {
     use super::*;
     use crate::algebras::integers::ZZ;
-    use crate::algebras::real::RR;
     use crate::polym::*;
     // use crate::polyu::*;
     use generic_array::typenum::U2;
@@ -133,10 +129,6 @@ mod tests {
         // let a = Poly::from_str(&ring, "3x^2 + 5x^98 + 0x^2 + 1x^2 - 1x^2").unwrap();
         // println!("{:?}", a);
         // println!("{}", a);
-
-        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
-
-        let a = Poly::from_str(&ring, "1.0x^1y^1 + 2.0x^1").unwrap();
 
         // Multivariate
         let ring = PRDomain::<ZZ, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
