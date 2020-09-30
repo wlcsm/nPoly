@@ -1,4 +1,5 @@
 use crate::algebras::*;
+use crate::{impl_one, impl_zero};
 
 #[derive(Clone, Copy, Debug)]
 pub struct RR(pub f64);
@@ -9,43 +10,44 @@ impl PartialEq for RR {
         (self.0 - other.0).abs() < 0.000000001
     }
 }
-impl std::cmp::Eq for RR {}
 
-// <><><><><> Constructors <><><><><> //
 impl RR {
-    pub fn new(val: f64) -> RR {
-        RR(val)
+    pub fn new(n: f64) -> RR {
+        RR(n)
+    }
+    /// TODO: Error checking?
+    pub fn from_int(n: usize) -> RR {
+        RR(n as f64)
     }
 }
 
-impl Zero for RR {
-    fn zero() -> Self {
-        RR(0.0)
-    }
-}
+impl_zero![RR, f64];
+impl_one![RR, f64];
 
-impl One for RR {
-    fn one() -> Self {
-        RR(1.0)
-    }
-}
+use std::ops;
 
-// <><><><><> Ring Implementation <><><><><> //
-impl Ring for RR {
-    type BaseRing = RR;
+impl_op_ex!(-|a: &RR| -> RR { RR(-a.0) });
 
-    fn add(&self, other: &Self) -> Self {
-        RR(self.0 + other.0)
-    }
-    fn sub(&self, other: &Self) -> Self {
-        RR(self.0 - other.0)
-    }
-    fn neg(&self) -> Self {
-        RR(-self.0)
-    }
-    fn mul(&self, other: &Self) -> Self {
-        RR(self.0 * other.0)
-    }
+impl_op_ex!(+ |a: &RR, b: &RR| -> RR { RR(a.0 + b.0) });
+impl_op_ex!(-|a: &RR, b: &RR| -> RR { RR(a.0 - b.0) });
+impl_op_ex!(*|a: &RR, b: &RR| -> RR { RR(a.0 * b.0) });
+impl_op_ex!(/ |a: &RR, b: &RR| -> RR { RR(a.0 / b.0) });
+
+impl_op_ex!(+= |a: &mut RR, b: &RR| { a.0 += b.0 });
+impl_op_ex!(-= |a: &mut RR, b: &RR| { a.0 -= b.0 });
+impl_op_ex!(*= |a: &mut RR, b: &RR| { a.0 *= b.0 });
+impl_op_ex!(/= |a: &mut RR, b: &RR| { a.0 /= b.0 });
+
+impl ClosedAdd for RR {}
+impl ClosedMul for RR {}
+
+impl MyRing for RR {}
+impl MyField for RR {}
+impl ScalarField for RR {}
+
+impl ScalarRing for RR {
+    // Regex doesn't allow space on left or right hand side
+    const REGEX: &'static str = r"-?\d*\.\d*\s*";
 }
 
 use std::fmt;
@@ -61,50 +63,5 @@ impl std::str::FromStr for RR {
 impl fmt::Display for RR {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
-    }
-}
-
-// <><><><><> Scalar Ring Implementation <><><><><> //
-impl ScalarRing for RR {
-    const REGEX: &'static str = r"\d*\.\d*";
-    fn add_ass(&mut self, other: &Self) {
-        self.0 += other.0
-    }
-
-    fn sub_ass(&mut self, other: &Self) {
-        self.0 -= other.0
-    }
-    fn mul_ass(&mut self, other: &Self) {
-        self.0 *= other.0
-    }
-}
-
-impl EuclideanDomain for RR {
-    fn divides(&self, _other: &Self) -> Option<bool> {
-        if *self != RR::zero() {
-            Some(true)
-        } else {
-            None
-        }
-    }
-    fn gcd(&self, _other: &Self) -> Self {
-        if *self != RR::zero() {
-            RR::one()
-        } else {
-            RR::zero()
-        }
-    }
-    fn lcm(&self, other: &Self) -> Self {
-        RR((self.0 * other.0) / self.gcd(&other).0)
-    }
-}
-
-impl Field for RR {
-    fn div(&self, other: &Self) -> Option<RR> {
-        if *other == RR::zero() {
-            None
-        } else {
-            Some(RR(self.0 / other.0))
-        }
     }
 }

@@ -1,36 +1,74 @@
 use crate::algebras::polyring::*;
 use crate::algebras::*;
+use num_traits::Zero;
 use std::cmp::Ordering;
 
 // Shorthand
-pub type PolyU<'a, R> = Poly<'a, PRDomain<R, UniIndex, UnivarOrder>>;
+pub type PolyU<'a, R> = Poly<'a, PRDomain<R, UniVarOrder>>;
 
-pub trait PolyRingUni: PolyRing<Var = UniIndex, Ord = UnivarOrder> {}
+pub trait PolyRingUni: PolyRing<NumVar = U1, Ord = UniVarOrder, Mon = UniIndex> {}
 
-impl<R: ScalarRing> PolyRingUni for PRDomain<R, UniIndex, UnivarOrder> {}
+impl<R: ScalarRing> PolyRingUni for PRDomain<R, UniVarOrder> {}
 
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct UnivarOrder();
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+pub struct UniVarOrder();
 
-impl MonomialOrdering<UniIndex> for UnivarOrder {
+impl MonOrd for UniVarOrder {
+    type Index = UniIndex;
+
     fn cmp(a: &UniIndex, b: &UniIndex) -> Ordering {
         a.0.cmp(&b.0)
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+impl std::iter::FromIterator<usize> for UniIndex {
+    fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Self {
+        UniIndex(iter.into_iter().next().unwrap())
+    }
+}
+
+use generic_array::GenericArrayIter;
+
+impl IntoIterator for UniIndex {
+    type Item = usize;
+    type IntoIter = GenericArrayIter<usize, typenum::U1>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unimplemented!()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Ord, PartialOrd, Hash)]
 pub struct UniIndex(pub(crate) usize);
 
 impl Zero for UniIndex {
     fn zero() -> Self {
         UniIndex(0)
     }
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
 }
+
+use std::ops;
+
+// Since UniIndex implements Copy, a default implementation for MyAddMonoid
+// is provided
+impl ClosedAdd for UniIndex {}
+impl_op_ex!(+ |a: &UniIndex, b: &UniIndex| -> UniIndex { UniIndex(a.0 + b.0) });
+impl_op_ex!(+= |a: &mut UniIndex, b: &UniIndex| { a.0 += b.0 });
+
+// impl MyAddMonoid for UniIndex {
+//     fn ref_add(&self, other: &Self) -> Self {
+//         UniIndex(self.0 + other.0)
+//     }
+// }
+
 use std::cmp::{max, min};
 use typenum::U1;
 impl VarNumber for U1 {}
 
-impl Variate for UniIndex {
+impl Monomial for UniIndex {
     type NumVar = U1;
 
     // TODO These get and set are not good and I should look for a way around this
@@ -45,21 +83,29 @@ impl Variate for UniIndex {
         self.0
     }
 
-    fn add(&self, other: &Self) -> Self {
-        UniIndex(self.0 + other.0)
-    }
-
-    fn sub(&self, other: &Self) -> Option<Self> {
-        if other.0 <= self.0 {
-            Some(UniIndex(self.0 - other.0))
-        } else {
+    fn div(&self, other: &Self) -> Option<Self> {
+        if self.0 < other.0 {
             None
+        } else {
+            Some(UniIndex(self.0 - other.0))
         }
     }
 
-    fn divides(&self, other: &Self) -> Option<bool> {
-        Some(self.0 <= other.0)
+    fn lex(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
     }
+
+    // fn sub(&self, other: &Self) -> Option<Self> {
+    //     if other.0 <= self.0 {
+    //         Some(UniIndex(self.0 - other.0))
+    //     } else {
+    //         None
+    //     }
+    // }
+
+    // fn divides(&self, other: &Self) -> Option<bool> {
+    //     Some(self.0 <= other.0)
+    // }
     fn gcd(&self, other: &Self) -> Self {
         UniIndex(min(self.0, other.0))
     }
@@ -75,58 +121,35 @@ impl<'a, P: PolyRingUni> Poly<'a, P> {
         let terms = coeffs
             .into_iter()
             .enumerate()
-            .filter(|(_, c)| *c != <P::Coeff>::zero())
+            .filter(|(_, c)| !c.is_zero())
             .map(|(i, c)| Term::new(c, UniIndex(i)))
             .collect();
 
-        Poly::from_terms_unchecked(terms, ring)
+        Poly::from_terms_unchecked(terms, Some(ring))
     }
 }
 
-impl<'a, F: Field> PolyU<'a, F> {
+impl<'a, F: ScalarField> PolyU<'a, F> {
     /// Standard O(n^2) multiplication
     pub fn mul(&self, other: &Self) -> Self {
         let mut acc = vec![<F>::zero(); self.deg() + other.deg() + 1];
 
         for Term {
             coeff: c_a,
-            deg: d_a,
+            mon: d_a,
         } in self.terms.iter()
         {
             for Term {
                 coeff: c_b,
-                deg: d_b,
+                mon: d_b,
             } in other.terms.iter()
             {
                 // I still don't know why I can't use method syntax for the tdeg calls...
-                acc[<UniIndex>::tot_deg(d_a) + <UniIndex>::tot_deg(d_b)].add_ass(&c_a.mul(&c_b));
+                acc[d_a.0 + <UniIndex>::tot_deg(d_b)] += *c_a * *c_b;
             }
         }
 
-        Poly::from_coeff(self.ring, acc)
-    }
-}
-
-use std::fmt;
-
-// Problem is that it's hard to put an ordering on the coefficients because in finite fields
-// thats quite ambiguious. I need it in the "if x < 0" line
-// This will eventually have to be overcome some time.
-impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Because we don't want a potential "+" out the front of the first term
-        if self.is_zero() {
-            write!(f, "{}", <P::Coeff>::zero())
-        } else {
-            let mut acc: String = self.terms[0].to_str(&self.ring);
-
-            self.terms
-                .iter()
-                .skip(1)
-                .for_each(|x| acc.push_str(&format!(" + {}", x.to_str(&self.ring))));
-
-            write!(f, "{}", acc)
-        }
+        Poly::from_coeff(self.ring.unwrap(), acc)
     }
 }
 
@@ -138,7 +161,7 @@ mod tests {
 
     #[test]
     fn display_test() {
-        let ring = PRDomain::<ZZ, UniIndex, UnivarOrder>::new(vec!['x']);
+        let ring = PRDomain::<ZZ, UniVarOrder>::new(vec!['x']);
         let a = Poly::from_str(&ring, "3x^2 + 5x^98").unwrap();
         println!("{}", a);
     }

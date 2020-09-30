@@ -1,5 +1,6 @@
-use crate::algebras::*;
 use crate::algebras::polyring::*;
+use crate::algebras::*;
+use num_traits::Zero;
 
 pub mod f4;
 pub mod groebner_basis;
@@ -11,8 +12,8 @@ pub struct Ideal<'a, P: PolyRing> {
 
 impl<'a, P: PolyRing> Ideal<'a, P> {
     pub fn new(gens: Vec<Poly<'a, P>>) -> Self {
-        Ideal { 
-            gens: gens.into_iter().filter(|t| !t.is_zero()).collect()
+        Ideal {
+            gens: gens.into_iter().filter(|t| !t.is_zero()).collect(),
         }
     }
     /// Returns a reference to the item if it was successfully added
@@ -34,8 +35,11 @@ use std::fmt;
 
 impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Ideal (\n {} )", 
-            self.gens.iter()
+        write!(
+            f,
+            "Ideal (\n {} )",
+            self.gens
+                .iter()
                 .map(|p| format!("{}", p))
                 .collect::<Vec<String>>()
                 .join("\n")
@@ -43,45 +47,47 @@ impl<'a, P: PolyRing> fmt::Display for Ideal<'a, P> {
     }
 }
 
-
 // Want to take ownership so that the ideal doesn't change.
 // If you want the ideal again then you need to get it from the destructor
 #[derive(Debug, Clone)]
 pub struct MonomialIdeal<'a, 'b, P: FPolyRing> {
-    gens: Vec<Term<P>>,
+    gens: Vec<P::Mon>,
     original: Option<&'b Ideal<'a, P>>,
 }
 
 impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
-    pub fn new(gens: Vec<Term<P>>) -> Self {
+    pub fn new(gens: Vec<P::Mon>) -> Self {
         // Take out any zeros
         MonomialIdeal {
-            gens: gens.into_iter().filter(|t| *t != Term::zero()).collect(),
+            gens: gens.into_iter().filter(|t| !t.is_zero()).collect(),
             original: None,
         }
     }
+    /// Has the problem that it might include repeated elements if more than one polynomial
+    /// has the same leading monomial. Might have to resolve that some time
     pub fn from(poly_ideal: &'b Ideal<'a, P>) -> Self {
         MonomialIdeal {
-            gens: poly_ideal.gens.iter().map(|a| a.lt().clone()).collect(),
+            gens: poly_ideal.gens.iter().map(|a| a.lm().clone()).collect(),
             original: Some(poly_ideal),
         }
     }
-    pub fn add(&mut self, item: Term<P>) {
-        if !self.is_in(&item) && item != Term::zero() {
+    pub fn add(&mut self, item: P::Mon) {
+        if !self.is_in(&item) && item != P::Mon::zero() {
             self.gens.push(item)
         }
     }
 
-    pub fn is_in(&self, term: &Term<P>) -> bool {
-        self.gens.iter().any(|t| t.divides(term).unwrap())
+    pub fn is_in(&self, term: &P::Mon) -> bool {
+        self.gens.iter().any(|t| term.divides(t).unwrap())
     }
 
-    pub fn get_poly(&self, term: &Term<P>) -> Option<&Poly<'a, P>> {
-        // If term is in the ideal it will return the element that corresponds to it
+    /// If term is in the ideal it will return the element that corresponds to it
+    /// This could be done faster
+    pub fn get_poly(&self, term: &P::Mon) -> Option<&Poly<'a, P>> {
         match self.original {
             Some(ideal) => {
                 for (lm, poly) in izip!(self.gens.iter(), ideal.gens.iter()) {
-                    if lm.divides(term).unwrap() {
+                    if term.divides(lm).unwrap() {
                         return Some(&poly);
                     }
                 }

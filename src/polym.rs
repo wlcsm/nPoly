@@ -1,61 +1,110 @@
-// Multivariate polynomial implementation
-//
-
+/// Multivariate polynomial.
+///
+/// Most importantly it defines the MultiIndex struct which holds terms with multiple
+/// indeterminates
 use crate::algebras::polyring::*;
 use crate::algebras::*;
 use generic_array::*;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+/// Holds the indices of the term.
+/// Also holds the total degree.
+/// TODO Make it so that the first term in the monomial is the total degree.
+#[derive(Clone, Debug, Hash)]
 pub struct MultiIndex<N: VarNumber> {
     total: usize,
     indices: GenericArray<usize, N>,
 }
 
+impl<N: VarNumber> PartialEq for MultiIndex<N> {
+    // First checks the total, then if it is true, checks the rest of the indices
+    fn eq(&self, other: &Self) -> bool {
+        self.total == other.total && self.indices == other.indices
+    }
+}
+impl<N: VarNumber> Eq for MultiIndex<N> {}
+
+/// Constructor
 impl<N: VarNumber> MultiIndex<N> {
-    fn new(ind: GenericArray<usize, N>) -> Self {
+    fn new(indices: GenericArray<usize, N>) -> Self {
         MultiIndex {
-            total: ind.iter().sum(),
-            indices: ind,
+            total: indices.iter().sum(),
+            indices,
         }
     }
 }
 
-impl<N: VarNumber + Debug> MultiIndexTrait for MultiIndex<N> {
-    type N = N;
+// TODO; Make this a macro to do all of them
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+pub struct GLex<I: Monomial>(PhantomData<I>);
 
-    fn lex(a: &Self, b: &Self) -> Ordering {
-        for (i, j) in izip!(&a.indices, &b.indices) {
-            if i != j {
-                return i.cmp(&j);
-            }
-        }
-        Ordering::Equal
-    }
-    fn glex(a: &Self, b: &Self) -> Ordering {
-        match a.total.cmp(&b.total) {
-            Ordering::Equal => <MultiIndex<N>>::lex(a, b),
+impl<I: Monomial> MonOrd for GLex<I> {
+    type Index = I;
+
+    fn cmp(itema: &I, itemb: &I) -> Ordering {
+        match itema.tot_deg().cmp(&itemb.tot_deg()) {
+            Ordering::Equal => itema.lex(itemb),
             ord => ord,
         }
     }
-    fn grlex(a: &Self, b: &Self) -> Ordering {
-        for (i, j) in izip!(&a.indices, &b.indices).rev() {
-            if i != j {
-                return j.cmp(&i); // Note that the order here is swapped
-            }
-        }
-        Ordering::Equal
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct Lex();
+
+use std::cmp::{max, min};
+
+impl<N: VarNumber> ClosedAdd for MultiIndex<N> {}
+
+pub fn binary_monomial_map<N: VarNumber>(
+    lhs: &MultiIndex<N>,
+    rhs: &MultiIndex<N>,
+    map: fn(usize, usize) -> usize,
+) -> MultiIndex<N> {
+    MultiIndex::new(
+        lhs.indices
+            .iter()
+            .zip(rhs.indices.iter())
+            .map(|(a, b)| map(*a, *b))
+            .collect(),
+    )
+}
+
+use std::ops::{Add, AddAssign};
+impl<N: VarNumber> Add for MultiIndex<N> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        binary_monomial_map(&self, &other, |a, b| a + b)
     }
 }
 
+use num_traits::Zero;
 impl<N: VarNumber> Zero for MultiIndex<N> {
     fn zero() -> Self {
-        MultiIndex::new(GenericArray::default())
+        Self::new(GenericArray::default())
+    }
+    fn is_zero(&self) -> bool {
+        self.total.is_zero()
     }
 }
 
-// and we'll implement IntoIterator
+impl<N: VarNumber> AddAssign<Self> for MultiIndex<N> {
+    fn add_assign(&mut self, other: Self) {
+        for (a, b) in self.indices.iter_mut().zip(other.indices.iter()) {
+            *a += b
+        }
+    }
+}
+
+impl<N: VarNumber> MyAddMonoid for MultiIndex<N> {
+    fn ref_add(&self, other: &Self) -> Self {
+        binary_monomial_map(self, other, |a, b| a + b)
+    }
+}
+
 impl<N: VarNumber> IntoIterator for MultiIndex<N> {
     type Item = usize;
     type IntoIter = GenericArrayIter<usize, N>;
@@ -65,49 +114,20 @@ impl<N: VarNumber> IntoIterator for MultiIndex<N> {
     }
 }
 
-use std::iter::FromIterator;
+use std::iter::Iterator;
 
-// and we'll implement FromIterator
-impl<N: VarNumber> FromIterator<usize> for MultiIndex<N> {
+impl<N: VarNumber> std::iter::FromIterator<usize> for MultiIndex<N> {
     fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Self {
-        let mut arr: GenericArray<usize, N> = GenericArray::default();
-        for (el, a) in iter.into_iter().zip(arr.iter_mut()) {
-            *a = el;
+        let indices_arr: GenericArray<usize, N> = iter.into_iter().collect();
+
+        MultiIndex {
+            total: indices_arr.iter().fold(0, |acc, a| acc + a),
+            indices: indices_arr,
         }
-        MultiIndex::new(arr)
     }
 }
 
-// TODO; Make this a macro to do all of them
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct GLex();
-
-impl<M: MultiIndexTrait> MonomialOrdering<M> for GLex {
-    fn cmp(a: &M, b: &M) -> Ordering {
-        <M>::glex(a, b)
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Debug)]
-pub struct Lex();
-
-impl<M: MultiIndexTrait> MonomialOrdering<M> for Lex {
-    fn cmp(a: &M, b: &M) -> Ordering {
-        <M>::lex(a, b)
-    }
-}
-
-pub trait MultiIndexTrait: Variate {
-    type N: VarNumber;
-
-    fn lex(a: &Self, b: &Self) -> Ordering;
-    fn glex(a: &Self, b: &Self) -> Ordering;
-    fn grlex(a: &Self, b: &Self) -> Ordering;
-}
-
-use std::cmp::{max, min};
-
-impl<N: VarNumber> Variate for MultiIndex<N> {
+impl<N: VarNumber> Monomial for MultiIndex<N> {
     type NumVar = N;
 
     fn tot_deg(&self) -> usize {
@@ -119,58 +139,68 @@ impl<N: VarNumber> Variate for MultiIndex<N> {
     }
 
     fn set(&mut self, ind: usize, val: usize) -> Option<()> {
-        let change = val - self.indices.get(ind)?;
+        self.total += val - self.indices.get(ind)?;
         self.indices[ind] = val;
-        self.total += change;
         Some(())
     }
 
-    fn add(&self, other: &Self) -> Self {
-        let new_indices = self
-            .indices
-            .iter()
-            .zip(other.indices.iter())
-            .map(|(a, b)| a + b)
-            .collect();
-
-        MultiIndex::new(new_indices)
-    }
-    fn sub(&self, other: &Self) -> Option<Self> {
-        let mut new_indices = GenericArray::default();
-        for i in 0..N::to_usize() {
-            if self.indices[i] >= other.indices[i] {
-                new_indices[i] = self.indices[i] - other.indices[i]
+    fn div(&self, other: &Self) -> Option<Self> {
+        // FIXME returns None if it isn't divisible or if other is zero, these
+        // two cases should be separate
+        let mut res = MultiIndex::zero();
+        let mut i = 0;
+        for (a, b) in self.indices.iter().zip(other.indices.iter()) {
+            if b <= a {
+                res.indices[i] = a - b
             } else {
                 return None;
             }
+            i += 1;
         }
-        Some(MultiIndex::new(new_indices))
+        Some(res)
     }
-    fn divides(&self, other: &Self) -> Option<bool> {
-        // Evaluates self | other, "self divides other"
-        Some(
-            self.indices
-                .iter()
-                .zip(other.indices.iter())
-                .all(|(a, b)| a <= b),
-        )
+
+    /// The find map short-circuits when the two indices are not equal.
+    /// If they are all equal then it returns None, in which case we
+    /// use a "map_or" to convert the None into a Ordering::Equal
+    fn lex(&self, other: &Self) -> Ordering {
+        self.indices.cmp(&other.indices)
+        // izip!(&self.indices, &other.indices).find_map(|(a, b)|
+        //     match a.cmp(&b) {
+        //         Ordering::Equal => None,
+        //         ord             => Some(ord)
+        //     })
+        //     .map_or(Ordering::Equal , |ord| {ord})
     }
+
     fn gcd(&self, other: &Self) -> Self {
-        MultiIndex::new(
-            self.indices
-                .iter()
-                .zip(other.indices.iter())
-                .map(|(a, b)| *min(a, b))
-                .collect(),
-        )
+        binary_monomial_map(self, other, |a, b| min(a, b))
     }
     fn lcm(&self, other: &Self) -> Self {
-        MultiIndex::new(
-            self.indices
+        binary_monomial_map(self, other, |a, b| max(a, b))
+    }
+}
+
+use crate::display::*;
+use std::fmt;
+
+// Problem is that it's hard to put an ordering on the coefficients because in finite fields
+// thats quite ambiguous. I need it in the "if x < 0" line
+// This will eventually have to be overcome some time.
+impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Because we don't want a potential "+" out the front of the first term
+        if self.is_zero() {
+            write!(f, "{}", <P::Coeff>::zero())
+        } else {
+            let mut acc: String = show_term(&self.terms[0], &self.ring);
+
+            self.terms
                 .iter()
-                .zip(other.indices.iter())
-                .map(|(a, b)| *max(a, b))
-                .collect(),
-        )
+                .skip(1)
+                .for_each(|x| acc.push_str(&format!(" + {}", show_term(x, &self.ring))));
+
+            write!(f, "{}", acc)
+        }
     }
 }

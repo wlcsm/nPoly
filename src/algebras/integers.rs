@@ -1,59 +1,35 @@
+extern crate alga;
+
 use crate::algebras::*;
-use alga::general::{AbstractMagma, Additive, Identity, Multiplicative, TwoSidedInverse};
+use crate::{impl_one, impl_zero};
+
+use num_traits::identities::{One, Zero};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd)]
 pub struct ZZ(pub i32);
 
-impl Identity<Additive> for ZZ {
-    fn identity() -> Self {
-        ZZ(0)
-    }
-}
-impl TwoSidedInverse<Additive> for ZZ {
-    fn two_sided_inverse(&self) -> Self {
-        ZZ(-self.0)
-    }
-    fn two_sided_inverse_mut(&mut self) {
-        self.0 *= -1
-    }
-}
-impl AbstractMagma<Additive> for ZZ {
-    fn operate(&self, other: &Self) -> Self {
-        ZZ(self.0 + other.0)
-    }
-}
-impl Identity<Multiplicative> for ZZ {
-    fn identity() -> Self {
-        ZZ(1)
-    }
-}
+impl ClosedAdd for ZZ {}
+impl ClosedMul for ZZ {}
+impl MyRing for ZZ {}
 
-impl One for ZZ {
-    fn one() -> Self {
-        ZZ(1)
-    }
-}
-impl Zero for ZZ {
-    fn zero() -> Self {
-        ZZ(0)
-    }
-}
+impl_zero![ZZ, i32];
+impl_one![ZZ, i32];
 
-impl Ring for ZZ {
-    type BaseRing = ZZ;
+use std::ops;
 
-    fn add(&self, other: &Self) -> Self {
-        ZZ(self.0 + other.0)
-    }
-    fn sub(&self, other: &Self) -> Self {
-        ZZ(self.0 - other.0)
-    }
-    fn neg(&self) -> Self {
-        ZZ(-self.0)
-    }
-    fn mul(&self, other: &Self) -> Self {
-        ZZ(self.0 * other.0)
-    }
+// Implement all the standard operations
+impl_op_ex!(-|a: &ZZ| -> ZZ { ZZ(-a.0) });
+
+impl_op_ex!(+ |a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 + b.0) });
+impl_op_ex!(-|a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 - b.0) });
+impl_op_ex!(*|a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 * b.0) });
+
+impl_op_ex!(+= |a: &mut ZZ, b: &ZZ| { a.0 += b.0 });
+impl_op_ex!(-= |a: &mut ZZ, b: &ZZ| { a.0 -= b.0 });
+impl_op_ex!(*= |a: &mut ZZ, b: &ZZ| { a.0 *= b.0 });
+
+impl ScalarRing for ZZ {
+    const REGEX: &'static str = r"-?\d+";
 }
 
 use std::fmt;
@@ -64,27 +40,23 @@ impl fmt::Display for ZZ {
     }
 }
 
-impl ScalarRing for ZZ {
-    const REGEX: &'static str = r"-?\d+";
-
-    fn add_ass(&mut self, other: &Self) {
-        self.0 += other.0
-    }
-    fn sub_ass(&mut self, other: &Self) {
-        self.0 -= other.0
-    }
-    fn mul_ass(&mut self, other: &Self) {
-        self.0 *= other.0
-    }
-}
-
 impl std::str::FromStr for ZZ {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.parse::<i32>() {
-            Ok(n) => Ok(ZZ(n)),
-            Err(e) => Err(e),
+        s.parse::<i32>().map(|x| ZZ(x))
+    }
+}
+
+impl EuclidDiv for ZZ {
+    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
+        if other.is_zero() {
+            None
+        } else {
+            Some((
+                ZZ(self.0.div_euclid(other.0)),
+                ZZ(self.0.rem_euclid(other.0)),
+            ))
         }
     }
 }
@@ -97,7 +69,7 @@ impl EuclideanDomain for ZZ {
             .and_then(|r| Some(r == 0))
     }
     fn gcd(&self, other: &Self) -> Self {
-        if self.0 == 0 {
+        if self.0.is_zero() {
             *other
         } else {
             ZZ(other.0 % self.0).gcd(&self)
