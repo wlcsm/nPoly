@@ -8,6 +8,12 @@ use std::ops;
 #[derive(Clone, Copy, Debug)]
 pub struct CC(pub Complex64);
 
+impl CC {
+    pub fn new(re: f64, im: f64) -> Self {
+        Self(Complex64::new(re, im))
+    }
+}
+
 // Approximations for now, I don't actually use this operation though in the FFT
 impl PartialEq for CC {
     fn eq(&self, other: &Self) -> bool {

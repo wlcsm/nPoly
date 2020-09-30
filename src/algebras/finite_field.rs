@@ -16,18 +16,12 @@ impl<P: Prime> PartialEq for FF<P> {
         self.0 == other.0 || <FF<P>>::red(self.0 - other.0) == 0
     }
 }
-
 impl<P: Prime> std::cmp::Eq for FF<P> {}
 
 impl<P: Prime> FF<P> {
     // Automatically reduces the number
     pub fn new(q: i64) -> Self {
         FF(q % P::to_i64(), PhantomData)
-    }
-
-    #[allow(dead_code)]
-    pub fn new_unchecked(q: i64) -> Self {
-        FF(q, PhantomData)
     }
 
     pub fn red(q: i64) -> i64 {
@@ -39,7 +33,7 @@ use std::fmt;
 
 impl<P: Prime> fmt::Debug for FF<P> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "F({})", self.0)
+        write!(f, "F<{}>({})", P::to_usize(), self.0)
     }
 }
 
@@ -49,55 +43,34 @@ impl<P: Prime> fmt::Display for FF<P> {
     }
 }
 
-impl<P: Prime> Zero for FF<P> {
-    fn zero() -> Self {
-        FF::new(0)
-    }
-}
-impl<P: Prime> One for FF<P> {
-    fn one() -> Self {
-        FF::new(1)
-    }
-}
+use crate::{impl_one, impl_zero};
+use num_traits::identities::{One, Zero};
 
-impl<P: Prime> Ring for FF<P> {
-    type BaseRing = FF<P>;
+use std::ops;
 
-    fn add(&self, other: &Self) -> Self {
-        FF::new(self.0 + other.0)
-    }
-    fn sub(&self, other: &Self) -> Self {
-        FF::new(self.0 - other.0)
-    }
-    fn neg(&self) -> Self {
-        FF::new(-self.0)
-    }
-    fn mul(&self, other: &Self) -> Self {
-        FF::new(self.0 * other.0)
-    }
-}
+impl ClosedAdd for FF {}
+impl ClosedMul for FF {}
+impl MyRing for FF {}
+
+impl_zero![FF, i32];
+impl_one![FF, i32];
+
+// Implement all the standard operations
+impl_op_ex!(-|a: &FF| -> FF { FF(-a.0) });
+
+impl_op_ex!(+ |a: &FF, b: &FF| -> FF { FF(a.0 + b.0) });
+impl_op_ex!(-|a: &FF, b: &FF| -> FF { FF(a.0 - b.0) });
+impl_op_ex!(*|a: &FF, b: &FF| -> FF { FF(a.0 * b.0) });
+
+impl_op_ex!(+= |a: &mut FF, b: &FF| { a.0 += b.0 });
+impl_op_ex!(-= |a: &mut FF, b: &FF| { a.0 -= b.0 });
+impl_op_ex!(*= |a: &mut FF<P>, b: &FF<P>| { a.0 *= b.0 });
 
 impl<P: Prime> std::str::FromStr for FF<P> {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.parse::<i64>() {
-            Ok(n) => Ok(FF::new(n)),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-impl<P: Prime> ScalarRing for FF<P> {
-    const REGEX: &'static str = r"-?\d+";
-    fn add_ass(&mut self, other: &Self) {
-        self.0 = <FF<P>>::red(self.0 + other.0)
-    }
-    fn sub_ass(&mut self, other: &Self) {
-        self.0 = <FF<P>>::red(self.0 - other.0)
-    }
-    fn mul_ass(&mut self, other: &Self) {
-        self.0 = <FF<P>>::red(self.0 * other.0)
+        s.parse::<i64>().map(|n| Ok(FF::new(n)))
     }
 }
 

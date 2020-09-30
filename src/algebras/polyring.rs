@@ -24,10 +24,11 @@ pub trait FPolyRing: PolyRing<Coeff: ScalarField> {}
 // Super trait for a polynomial whose coefficients are discrete
 pub trait PolyRingDiscrete: PolyRing<Coeff: Eq + PartialEq + Ord> {}
 
-use generic_array::typenum::{U2, U3};
+use generic_array::typenum::{U2, U3, U10};
 
 impl VarNumber for U2 {}
 impl VarNumber for U3 {}
+impl VarNumber for U10 {}
 
 // I used a vector here instead of an array with exact length because GenericArray
 // was a real pain to deal with at the time.
@@ -37,6 +38,7 @@ pub struct PRDomain<R: ScalarRing, M: MonOrd> {
     ring_parameters: PhantomData<(R, M)>,
 }
 
+// Can't use the derive macro it seems because it doesn't know how to compare PhantomData perhaps
 impl<F, M> PartialEq for PRDomain<F, M>
 where
     F: ScalarRing,
@@ -169,12 +171,6 @@ pub struct Term<P: PolyRing> {
 
 use std::cmp::Ord;
 
-// impl<P: PolyRingDiscrete> PartialEq for Term<P> {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.mon == other.mon && self.coeff == other.coeff
-//     }
-// }
-
 impl<P: PolyRing> Eq for Term<P> {}
 
 impl<P: PolyRing> Term<P> {
@@ -238,12 +234,11 @@ impl<P: FPolyRing> EuclidDiv for Term<P> {
     /// Returns None if other is zero
     fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
         if other.is_zero() {
-            None
-        } else {
-            match self.mon.div(&other.mon) {
-                Some(q) => Some((Term::new(self.coeff / other.coeff, q), Term::zero())),
-                None => Some((Term::zero(), self.clone())),
-            }
+            return None
+        } 
+        match self.mon.div(&other.mon) {
+            Some(q) => Some((Term::new(self.coeff / other.coeff, q), Term::zero())),
+            None    => Some((Term::zero(), self.clone())),
         }
     }
 }
@@ -265,10 +260,7 @@ impl<P: FPolyRing> Term<P> {
 
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
 impl<'a, P: PolyRing> Poly<'a, P> {
-    // pub(crate) fn get(&self, i: usize) -> Option<&Term<P>> {
-    //     self.terms.get(i)
-    // }
-
+    //
     // A get_unchecked implementation
     pub(crate) fn get_unchecked(&self, i: usize) -> &Term<P> {
         unsafe { self.terms.get_unchecked(i) }
@@ -303,15 +295,6 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     pub fn has(&self, t: &P::Mon) -> Option<P::Coeff> {
         match self.terms.binary_search_by(|a| <P::Ord>::cmp(&a.mon, &t)) {
             Ok(i) => Some(self.terms[i].coeff),
-            // I feel like we don't need this check anymore since it should be an invariant
-            // that there are no zero coefficients
-            // {
-            // if self.terms[i].coeff.is_zero() {
-            //     Some(self.terms[i].coeff)
-            // } else {
-            //     None
-            // }
-            // }
             Err(_) => None,
         }
     }
@@ -324,21 +307,6 @@ pub trait MonOrd: Clone + PartialEq + Debug + Eq + std::hash::Hash {
     type Index: Monomial;
     fn cmp(a: &Self::Index, b: &Self::Index) -> Ordering;
 }
-
-// pub trait Indices: MyAddMonoid {
-//     type NumVar:  VarNumber;
-//     const NUMVAR: usize;
-
-//     fn div(&self, other: &Self) -> Option<Self>;
-
-//     fn divides(&self, other: &Self) -> Option<bool> {
-//         if self.is_zero() {
-//             None
-//         } else {
-//             Some(self.div(other).is_some())
-//         }
-//     }
-// }
 
 pub trait Monomial:
     IntoIterator<Item = usize, IntoIter = GenericArrayIter<usize, <Self as Monomial>::NumVar>>
@@ -367,6 +335,7 @@ pub trait Monomial:
     // FIXME This returns None it is isn't divisble and if other is zero
     // there should be something to distinguish these two cases
 }
+
 
 impl<'a, P: PolyRing> Add for &Poly<'a, P> {
     type Output = Poly<'a, P>;
@@ -502,7 +471,8 @@ mod tests {
     use crate::algebras::real::RR;
     use crate::parse::*;
     use crate::polyu::UniVarOrder;
-    use test::Bencher;
+    use crate::bench::*;
+    use crate::polym::*;
 
     #[test]
     fn schoolbook_mult_test() {
@@ -514,21 +484,23 @@ mod tests {
         println!("{}", res)
     }
 
-    #[bench]
-    fn schoolbook_mult_bench(b: &mut Bencher) {
-        let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
-        let poly_a = Poly::from_str(&ring, "1.0x^1 + 3.0x^2 + 5.0x^5").unwrap();
-        let poly_b = Poly::from_str(&ring, "1.0x^1 + 2.0x^3 + 2.0x^5").unwrap();
+    #[test]
+    fn schoolbook_mult_bench() {
 
-        b.iter(|| poly_a.clone() * poly_b.clone());
+        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
+
+        let mut tester = Tester {
+            num_el: 5,
+            deg_sizes: arr![usize; 2, 3],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        println!("Hashmap time = {} microseconds", time.num_microseconds().unwrap());
     }
 }
-
-// impl<'a, P: PolyRing> MulAssign<Right=P::Coeff> for Poly<'a, P> {
-//     fn mul_assign(self, scalar: Self) {
-//         self.elementwise_map_mut(|c| c * scalar)
-//     }
-// }
 
 impl<'a, P: PolyRing> One for Poly<'a, P> {
     fn one() -> Self {
@@ -571,20 +543,6 @@ impl<'a, P: PolyRing> Mul<Term<P>> for &Poly<'a, P> {
         Poly::from_terms_unchecked(new_terms, self.ring)
     }
 }
-
-// Causes some confliction
-// impl<'a, P: PolyRing> Mul<P::Coeff> for &Poly<'a, P> {
-
-//     type Output = Poly<'a, P>;
-
-//     fn mul(&self, scalar: P::Coeff) -> Poly<'a, P> {
-//         if scalar.is_zero() {
-//             Poly::zero()
-//         } else {
-//             self.elementwise_map(|t| Term::new(t.coeff * scalar, t.mon.clone()))
-//         }
-//     }
-// }
 
 /// Scale assign
 /// FIXME This can have a problem if P::Coeff is not an integral domain and then some of the
@@ -650,12 +608,6 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     ) -> Self {
         // Gets the ring the result is going to be in
         let ring = resolve_for_constants(&polya, &polyb);
-
-        // Knowing which polynomial is bigger is advantages here
-        // let (smol, bigg) = match polya.num_terms().cmp(&polyb.num_terms()) {
-        //     Ordering::Less => (&polya, &polyb),
-        //     _ => (&polyb, &polya),
-        // };
 
         // Note: with_capacity allocates memory, should be deallocate some after we
         //       finished?

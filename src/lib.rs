@@ -26,6 +26,7 @@ pub mod error;
 pub mod fast_mult;
 pub mod fft;
 pub mod ideals;
+pub mod kronecker;
 pub mod mathutils;
 pub mod parse;
 pub mod polym;

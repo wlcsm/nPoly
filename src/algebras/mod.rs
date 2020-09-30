@@ -1,5 +1,5 @@
 pub mod complex;
-// pub mod finite_field;
+pub mod finite_field;
 pub mod integers;
 pub mod polyring;
 pub mod real;
@@ -56,6 +56,42 @@ impl<M: Copy + MyMulMonoid + Div<Output = Self>> MyMulGroup for M {
     fn ref_div(&self, other: &Self) -> Self {
         *self / *other
     }
+}
+
+
+#[macro_export]
+macro_rules! derive_op {
+    ($newtype:ty; $op:item $(,$gen_param:tt)?) => {
+        impl$gen_param std::ops::$op for $newtype $gen_param {
+            type Output = $newtype $gen_param;
+            fn get_name!($op)(self, rhs: $alias) -> Self {
+                self.0 get_op!($op) rhs.0
+            }
+        }
+    };
+}
+
+macro_rules! impl_FooTrait {
+    ($name:ty, $lifetime:tt) => {
+        impl<$lifetime> $crate::FooTrait for $name<$lifetime> {  }
+    };
+    ($name:ty) => {
+        impl $crate::FooTrait for $name {  }
+    };
+}
+
+#[macro_export]
+macro_rules! get_op {
+    (Add) => {+};
+    (Sub) => {-};
+    (Mul) => {*};
+}
+
+#[macro_export]
+macro_rules! get_name {
+    (Add) => {add};
+    (Sub) => {sub};
+    (Mul) => {mul};
 }
 
 #[macro_export]
@@ -121,12 +157,17 @@ pub trait EuclideanDomain: MyRing {
 }
 
 impl<F: MyField> EuclideanDomain for F {
+    #[inline(always)]
     fn gcd(&self, _other: &Self) -> Self {
         self.clone()
     }
+
+    #[inline(always)]
     fn lcm(&self, _other: &Self) -> Self {
         self.clone()
     }
+
+    #[inline(always)]
     fn divides(&self, _other: &Self) -> Option<bool> {
         if self.is_zero() {
             None

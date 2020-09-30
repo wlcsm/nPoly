@@ -144,57 +144,57 @@ pub mod karatsuba {
         use chrono::*;
         use rand::distributions::uniform::UniformSampler;
 
-        #[test]
-        fn karatsuba_small_test() {
-            let res = karatsuba_tester(vec![2, 10, 40]);
-            for (size, time) in res {
-                println!(
-                    "Karatsuba's algorithm took {} to multiply polynomials of degree {}",
-                    time, size
-                )
-            }
-        }
+        // #[test]
+        // fn karatsuba_small_test() {
+        //     let res = karatsuba_tester(vec![2, 10, 40]);
+        //     for (size, time) in res {
+        //         println!(
+        //             "Karatsuba's algorithm took {} to multiply polynomials of degree {}",
+        //             time, size
+        //         )
+        //     }
+        // }
 
-        #[test]
-        fn karatsuba_medium_test() {
-            let res = karatsuba_tester(vec![1 << 7, 1 << 8, 1 << 9]);
-            for (size, time) in res {
-                println!(
-                    "Karatsuba's algorithm took {} to multiply polynomials of degree {}",
-                    time, size
-                )
-            }
-        }
+        // #[test]
+        // fn karatsuba_medium_test() {
+        //     let res = karatsuba_tester(vec![1 << 7, 1 << 8, 1 << 9]);
+        //     for (size, time) in res {
+        //         println!(
+        //             "Karatsuba's algorithm took {} to multiply polynomials of degree {}",
+        //             time, size
+        //         )
+        //     }
+        // }
 
-        /// Takes a vector of usize and then generates two polynomials of that size and multiplies
-        /// them with Karatsuba's algorithm. Returns vector containing the original argument and
-        /// the duration of the multiplication in a tuple
-        fn karatsuba_tester(test_sizes: Vec<usize>) -> Vec<(usize, Duration)> {
-            let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
+        // /// Takes a vector of usize and then generates two polynomials of that size and multiplies
+        // /// them with Karatsuba's algorithm. Returns vector containing the original argument and
+        // /// the duration of the multiplication in a tuple
+        // fn karatsuba_tester(test_sizes: Vec<usize>) -> Vec<(usize, Duration)> {
+        //     let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
 
-            let mut rng = rand::thread_rng();
-            let dist = MyUniformDistRR::new(RR(-10.0), RR(10.0));
+        //     let mut rng = rand::thread_rng();
+        //     let dist = RR::gen_sampler(RR(10.0));
 
-            // A function to randomly generate a polynomial with n coefficients
-            let mut make_poly = |n: usize| -> PolyU<RR> {
-                let res_vec = (0..n).map(|_| dist.sample(&mut rng)).collect();
-                Poly::from_coeff(&ring, res_vec)
-            };
+        //     // A function to randomly generate a polynomial with n coefficients
+        //     let mut make_poly = |n: usize| -> PolyU<RR> {
+        //         let res_vec = (0..n).map(|_| dist.sample(&mut rng)).collect();
+        //         Poly::from_coeff(&ring, res_vec)
+        //     };
 
-            test_sizes
-                .into_iter()
-                .map(|size| {
-                    let execution_time = {
-                        let a = make_poly(size);
-                        let b = make_poly(size);
+        //     test_sizes
+        //         .into_iter()
+        //         .map(|size| {
+        //             let execution_time = {
+        //                 let a = make_poly(size);
+        //                 let b = make_poly(size);
 
-                        Duration::span(|| {
-                            karatsuba(&a, &b);
-                        })
-                    };
-                    (size, execution_time)
-                })
-                .collect()
-        }
+        //                 Duration::span(|| {
+        //                     karatsuba(&a, &b);
+        //                 })
+        //             };
+        //             (size, execution_time)
+        //         })
+        //         .collect()
+        // }
     }
 }
