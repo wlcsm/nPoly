@@ -1,7 +1,80 @@
 use crate::algebras::polyring::*;
-use crate::display::*;
 use crate::ideals::*;
 use num_traits::Zero;
+
+/// F4 Algorithm
+
+/// Current Strategy
+/// 
+/// 1. Sort the polynomials in terms of their lead monomials
+/// 2. Start from the largest polynomial
+/// 3. Check if the next polynomial has the same lead monomial, and if it does, subtract them to cancel it
+/// 4. Repeat this until the lead monomials become smaller, since the list was sorted we can stop here
+/// 5. Then we need to reorder the polynomials that we operated on in case now that their lead monomials have been cancelled, they might be out of order, this is a fairly quick procedure since everything should be using pointers anyway
+/// 6. Then repeat this procedure with the polynomials will higher lead monomials than the current one, this is to put it into RREF.
+/// 
+/// ## Potentially better Stratgey
+/// 
+/// Assume the polynomials are sorted
+/// We manage three lists, Sorted, Unsorted and Done
+/// - Pending are the ones we haven't considered yet
+/// - Done are the ones that don't do any more cancellations, they will be in REF, waiting to be put into RREF
+/// 
+/// 1. Start with the largest polynomial in terms of lead term size in the sorted list
+/// 2. Cancel out the lead terms. Remember the lead terms of the resulting polynomials, they are now in the unsorted pile
+/// 3. Put this polynomial in the Done list
+/// 4. Then add the polynomials with the highest lead term from the sorted list into the unsorted one, also adding its lead term.
+/// 6. Select the next biggest lead term, and check if it is in the initial ideal of G. If this was the one from the sorted list, add the next one from the sorted list also into it.
+///     - If it is, then use the polynomial from $G$ to subtract the terms and also from in the done pile. We don't actually include this polynomial in any of the piles because we know that it won't end up in $N^+$.
+///     - If not, then subtract any other polynomials and then add it into the Done pile
+/// 7. Remembering to add the new lead terms into the monomial list as well. If the unsorted pile is empty, then add the polynomials will the highest lead terms from the sorted list
+/// 
+/// ## Searching Monomial Ideals 
+/// 
+/// I'm trying to make the process of determining whether a monomial is in an ideal or not as quick as possible. We simply need to see if one of the generators divides it. If $n$ is the number of generators and $m$ the number of indices, then this will be a $O(nm)$ search.
+/// 
+/// What we could do is a kind of lexicographical sort. So we sort based on the first index, then on the second an so forth. 
+/// On average in our search we would expect to cut down the number of elements we need to search through by half each time. This is fairly good. Some improvements are:
+/// 
+/// 1. Let $a$ be the monomial we are using to search, and let $d$ be its total degree. Then if we are searching through the monomials that have degree $l$ then we know that every monomial is granted $d - l$ amount of leniency. By this I mean that if the first index of $a$ is greater than $d -l$ on the currently examined monomial's index then we know that it cannot divide it.
+/// 2. Use the total degree to search, then the total degree of the first $m/2$ indices, then so on. I believe this will cut down approximately half the monomial on average again, but the variance will be much lower
+/// 
+/// If we use the second point, we can actually define a new monomial order based off this. Where the first index is the sum of the first m/2 elements, the second is the sum of the first m/4, the third is the sum of the third m/4 indices and so on. Then it would be interesting to see if this improves the performance of some Grobner basis ones that work particularly well of degree-based monomial orderings, since this is essentially a super-degree based ordering
+/// 
+/// 
+/// # Structure of Polynomial
+/// 
+/// The polynomial type is generic in three parameters at the moment.
+/// 
+/// * Coefficient ring
+/// * The type of monomial
+/// * Monomial ordering
+/// ```rust
+/// type Coeff: ScalarRing;
+/// type Mon: Monomial;
+/// type Ord: MonOrd<Index = Self::Mon>;
+/// ```
+/// 
+/// The type of monomial determines how it is stored in memory. That is, is it stored as a vector, or a single number, or an array, does it store its total degree along side it etc.
+/// 
+/// I have chosen the following structure for the terms
+///        Term
+///         |
+///      ---+---
+///     |       |
+///   Monomial Coeff
+///     |
+///    -+-----
+///   |       |
+/// MonOrd IndexRep(resentation)
+/// 
+/// I chose to have an independent monomial type since it is sometimes beneficial to split off the monomial from the term, especially in Groebner basis calculations or making monomial ideals.
+/// 
+/// # Qualified Values
+/// 
+/// Here I am talking about having a struct which acts as a guarantee that the value holds some certain properties at runtime.
+/// In particular I'm interested in asserting that the value is not zero, because then I don't have to be constantly checking for it and wrapping all my function's return values in an Option type. It can also be then checked once and not again if the operation is guaranteed not to return a zero e.g. multiplication, division, S-polynomial.
+/// 
 
 /// Converts the generators into a Groebner basis using the F4 algorithm
 /// Psuedocode in CLO

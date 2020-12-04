@@ -97,3 +97,24 @@ impl<'a, 'b, P: FPolyRing> MonomialIdeal<'a, 'b, P> {
         }
     }
 }
+
+// #[cfg(test)]
+// mod test {
+
+//     use crate::algebras::real::*;
+//     use crate::parse::MyFromStr;
+//     use crate::polym::*;
+//     use generic_array::typenum::{U2, U3};
+
+//     use crate::algebras::polyring::*;
+//     use crate::display::*;
+//     use crate::ideals::*;
+//     use num_traits::Zero;
+//     #[test]
+//     fn is_in() {
+//         let ideal = MonomialIdeal::new((0..100).map(|i| {
+//             Term::new(ZZ(1), 
+//                       MultiIndex::new((0..U3::to_usize()).map(|i| rand()).collect::<GenericArray<usize, U3>>()))
+//         }).collect();
+//     }
+// }

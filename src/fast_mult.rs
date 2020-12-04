@@ -136,13 +136,13 @@ pub mod karatsuba {
 
     #[cfg(test)]
     mod test {
-        extern crate test;
-        use super::*;
-        use crate::algebras::real::RR;
-        use crate::bench::*;
-        use crate::polyu::UniVarOrder;
-        use chrono::*;
-        use rand::distributions::uniform::UniformSampler;
+        // extern crate test;
+        // use super::*;
+        // use crate::algebras::real::RR;
+        // use crate::bench::*;
+        // use crate::polyu::UniVarOrder;
+        // use chrono::*;
+        // use rand::distributions::uniform::UniformSampler;
 
         // #[test]
         // fn karatsuba_small_test() {

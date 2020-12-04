@@ -12,21 +12,22 @@ impl ClosedAdd for ZZ {}
 impl ClosedMul for ZZ {}
 impl MyRing for ZZ {}
 
-impl_zero![ZZ, i32];
-impl_one![ZZ, i32];
 
 use std::ops;
 
+impl_zero![ZZ, i32];
+impl_one![ZZ, i32];
+
 // Implement all the standard operations
-impl_op_ex!(-|a: &ZZ| -> ZZ { ZZ(-a.0) });
+impl_op_ex!(-   |a: &ZZ|         -> ZZ { ZZ(-a.0) });
 
-impl_op_ex!(+ |a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 + b.0) });
-impl_op_ex!(-|a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 - b.0) });
-impl_op_ex!(*|a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 * b.0) });
+impl_op_ex!(+   |a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 + b.0) });
+impl_op_ex!(-   |a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 - b.0) });
+impl_op_ex!(*   |a: &ZZ, b: &ZZ| -> ZZ { ZZ(a.0 * b.0) });
 
-impl_op_ex!(+= |a: &mut ZZ, b: &ZZ| { a.0 += b.0 });
-impl_op_ex!(-= |a: &mut ZZ, b: &ZZ| { a.0 -= b.0 });
-impl_op_ex!(*= |a: &mut ZZ, b: &ZZ| { a.0 *= b.0 });
+impl_op_ex!(+= |a: &mut ZZ, b: &ZZ|    { a.0 += b.0 });
+impl_op_ex!(-= |a: &mut ZZ, b: &ZZ|    { a.0 -= b.0 });
+impl_op_ex!(*= |a: &mut ZZ, b: &ZZ|    { a.0 *= b.0 });
 
 impl ScalarRing for ZZ {
     const REGEX: &'static str = r"-?\d+";

@@ -99,11 +99,11 @@ impl<N: VarNumber> AddAssign<Self> for MultiIndex<N> {
     }
 }
 
-impl<N: VarNumber> MyAddMonoid for MultiIndex<N> {
-    fn ref_add(&self, other: &Self) -> Self {
-        binary_monomial_map(self, other, |a, b| a + b)
-    }
-}
+// impl<N: VarNumber> MyAddMonoid for MultiIndex<N> {
+//     fn ref_add(&self, other: &Self) -> Self {
+//         binary_monomial_map(self, other, |a, b| a + b)
+//     }
+// }
 
 impl<N: VarNumber> IntoIterator for MultiIndex<N> {
     type Item = usize;

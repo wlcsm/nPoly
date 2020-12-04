@@ -1,4 +1,4 @@
-// This only does the base 2 FFT. For an arbitrary base, see "fft-mullti-base.rs"
+// This only does the base 2 FFT. For an arbitrary base, see "fft-multi-base.rs"
 extern crate chrono;
 
 use crate::algebras::*;
@@ -10,7 +10,7 @@ pub trait SupportsFFT: ScalarField {
     fn divby2(&mut self, n: usize);
 }
 
-// Warning: Does it infix by default for speed, infix on a_sig
+// Warning: Does it infix by default for speed, infix on a_Sig
 pub fn eval_interp<F>(a_sig: &mut [F], b_sig: &mut [F]) -> Result<(), &'static str>
 where
     F: SupportsFFT,
@@ -60,7 +60,7 @@ pub fn perform_fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'
     // Sample is the signal. Performs the FFT inline
     // Does not normalise the inverse!
 
-    // Basic contraint checking
+    // Basic constraint checking
     match signal.len() {
         0 => Err("Signal cannot be empty"),
         n if !n.is_power_of_two() => Err("Signal needs to be a power of two"),
@@ -157,21 +157,16 @@ mod tests {
         let mut time_mult = |n: usize| {
             let a = make_poly(n);
             let b = make_poly(n);
-
-            println!("-------------------------------------------");
-            println!("Number of elements = {}", n);
-            println!("-------------------------------------------");
             println!(
-                "FFT: {:?}",
+                "FFT {}: time = {:?}", n,
                 Duration::span(|| {
                     a.fast_mult(&b);
                 })
             );
-            println!("-------------------------------------------");
         };
 
-        for i in 5..16 {
-            time_mult(1 << i);
+        for i in [5usize, 10usize,20usize, 30usize, 50usize, 100usize, 500usize, 1000usize, 1600000usize, 1800000usize, 2000000usize,2200000usize,2400000usize,].iter() {
+            time_mult(*i);
         }
     }
 

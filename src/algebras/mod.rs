@@ -1,5 +1,5 @@
 pub mod complex;
-pub mod finite_field;
+// pub mod finite_field;
 pub mod integers;
 pub mod polyring;
 pub mod real;
@@ -20,7 +20,7 @@ pub trait MyAddMonoid: Zero + Clone + ClosedAdd + PartialEq + Debug {
     fn ref_add(&self, other: &Self) -> Self;
 }
 
-impl<M: Zero + Sized + Copy + ClosedAdd + PartialEq + Debug> MyAddMonoid for M {
+impl<M: Zero + Sized + ClosedAdd + PartialEq + Debug> MyAddMonoid for M {
     fn ref_add(&self, other: &Self) -> Self {
         *self + *other
     }
@@ -32,7 +32,7 @@ pub trait MyMulMonoid: One + Sized + Clone + ClosedMul + PartialEq + Debug {
     fn ref_mul(&self, other: &Self) -> Self;
 }
 
-impl<M: One + Copy + ClosedMul + PartialEq + Debug> MyMulMonoid for M {
+impl<M: One + ClosedMul + PartialEq + Debug> MyMulMonoid for M {
     fn ref_mul(&self, other: &Self) -> Self {
         *self * *other
     }
@@ -71,14 +71,6 @@ macro_rules! derive_op {
     };
 }
 
-macro_rules! impl_FooTrait {
-    ($name:ty, $lifetime:tt) => {
-        impl<$lifetime> $crate::FooTrait for $name<$lifetime> {  }
-    };
-    ($name:ty) => {
-        impl $crate::FooTrait for $name {  }
-    };
-}
 
 #[macro_export]
 macro_rules! get_op {
@@ -153,7 +145,14 @@ pub trait EuclidDiv: MyMulMonoid {
 pub trait EuclideanDomain: MyRing {
     fn gcd(&self, other: &Self) -> Self;
     fn lcm(&self, other: &Self) -> Self;
-    fn divides(&self, other: &Self) -> Option<bool>; // Option in case other == 0
+
+    // Order is: self / other. Is None if other is zero, otherwise it returns (q, r) where q is
+    // the quotient and r is the remainder
+    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)>;
+
+    fn divides(&self, other: &Self) -> Option<bool> {
+        self.euclid_div(other).map(|(_, r)| r.is_zero())
+    }
 }
 
 impl<F: MyField> EuclideanDomain for F {
@@ -165,6 +164,14 @@ impl<F: MyField> EuclideanDomain for F {
     #[inline(always)]
     fn lcm(&self, _other: &Self) -> Self {
         self.clone()
+    }
+
+    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
+        if other.is_zero() {
+            None
+        } else {
+            Some((*self / *other, F::zero()))
+        }
     }
 
     #[inline(always)]

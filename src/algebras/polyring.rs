@@ -1,33 +1,44 @@
 use crate::algebras::*;
+use std::cmp::Ord;
+use num_traits::{One, Zero};
+use generic_array::typenum::Unsigned;
 use generic_array::*;
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-// <><><><><><><><><><> Poly Ring Domain <><><><><><><><><><> //
-// I made this a trait because I plan to optimise for quotient rings later
-// on.
+/// Holds the information for the polynomial ring as associated items
+///
+/// Currently it holds the coefficient algebra (Coeff), monomial ordering (Ord), monomial
+/// representation (Mon), and the number of variables (NumVar)
+///
+/// I also need to obtain the actual symbols used in the ring, though that is interfaced using a
+/// function rather than a type.
+///
 pub trait PolyRing: Eq + PartialEq + Clone + std::fmt::Debug {
-    type Coeff: ScalarRing;
-    type Ord: MonOrd<Index = Self::Mon>;
-    type Mon: Monomial<NumVar = Self::NumVar>;
+    type Coeff:  ScalarRing;
+    type Ord:    MonOrd<Index = Self::Mon>;
+    type Mon:    Monomial<NumVar = Self::NumVar>;
     type NumVar: VarNumber;
     fn symb(&self) -> Vec<char>;
 }
+
+/// Needs additional requirements that were not able to be provided by the GenericArray trait
 pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug + std::hash::Hash {}
 
-// Super trait for a polynomial whose coefficients are in a field
-// This is where I use the associated_type_bounds feature
+/// Polynomial Rings which has coefficients in a field
+/// Here uses the associated_type_bounds feature
 pub trait FPolyRing: PolyRing<Coeff: ScalarField> {}
 
-// Super trait for a polynomial whose coefficients are discrete
+/// Polynomials whose coefficients are discrete
 pub trait PolyRingDiscrete: PolyRing<Coeff: Eq + PartialEq + Ord> {}
 
-use generic_array::typenum::{U2, U3, U10};
+use generic_array::typenum::{U2, U3, U5, U10};
 
 impl VarNumber for U2 {}
 impl VarNumber for U3 {}
+impl VarNumber for U5 {}
 impl VarNumber for U10 {}
 
 // I used a vector here instead of an array with exact length because GenericArray
@@ -38,7 +49,8 @@ pub struct PRDomain<R: ScalarRing, M: MonOrd> {
     ring_parameters: PhantomData<(R, M)>,
 }
 
-// Can't use the derive macro it seems because it doesn't know how to compare PhantomData perhaps
+/// Equality is checked by checking the variables (note that it is dependent on the ordering).
+/// Can't use the derive macro it seems because it doesn't know how to compare PhantomData perhaps
 impl<F, M> PartialEq for PRDomain<F, M>
 where
     F: ScalarRing,
@@ -49,19 +61,12 @@ where
     }
 }
 
-impl<F, M> Eq for PRDomain<F, M>
-where
-    F: ScalarRing,
-    M: MonOrd,
-{
-}
+impl<F: ScalarRing, M: MonOrd> Eq for PRDomain<F, M> {}
 
-impl<F, M> FPolyRing for PRDomain<F, M>
-where
-    F: ScalarField,
-    M: MonOrd,
-{
-}
+/// Anything that is a polynomial ring with coefficients in a field automatically implements the
+/// FPolyRing trait.
+impl<P: PolyRing<Coeff: ScalarField>> FPolyRing for P {}
+
 
 impl<R, M> Debug for PRDomain<R, M>
 where
@@ -78,28 +83,26 @@ where
     R: ScalarRing,
     M: MonOrd,
 {
-    type Coeff = R;
-    type Mon = M::Index;
+    type Coeff  = R;
+    type Mon    = M::Index;
     type NumVar = <M::Index as Monomial>::NumVar;
-    type Ord = M;
+    type Ord    = M;
     fn symb(&self) -> Vec<char> {
         self.vars.clone()
     }
 }
 
-use generic_array::typenum::Unsigned;
 
+/// Creates a PRDomain instance from a list of characters denoting the symbols of the indeterminates.
+/// Panics if the number of characters supplied is not equal to the number of indeterminates
+/// specified in the MonOrd trait.
+/// This could be checked at compile time if we only took GenericArrays instead of vectors but they
+/// are a pain at the moment.
 impl<R, M> PRDomain<R, M>
 where
     R: ScalarRing,
     M: MonOrd,
 {
-    /// Creates a PRDomain instance from a list of characters denoting the symbols
-    /// of the indeterminates.
-    /// Panics if the number of characters supplied is not equal to the number of indeterminates
-    /// specified in the MonOrd trait.
-    /// This could be checked at compile time if we only took GenericArrays instead of vectors
-    /// but they are a pain at the moment.
     pub fn new(vars: Vec<char>) -> Self {
         if vars.len() != <M::Index as Monomial>::NumVar::to_usize() {
             panic!("Number of variable symbols supplied to create ring is not the same as its type definition");
@@ -111,8 +114,10 @@ where
     }
 }
 
-// <><><><><><><><><><> Polynomial <><><><><><><><><><> //
-
+/// Generic Sparse Polynomial type. 
+///
+/// Holds a vector of terms as well as the polynomial ring it resides in.
+///
 #[derive(Debug, Clone, PartialEq)]
 pub struct Poly<'a, P: PolyRing> {
     pub(crate) terms: Vec<Term<P>>,
@@ -154,22 +159,15 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
 }
 
-// <><><><><><><><><><> Term <><><><><><><><><><> //
 /// The Term struct.
-/// It holds a coefficient and a monomial, both are generic.
-/// Terms are not ordered but monomials are.
-/// This is because two terms should be equal if and only if both their coefficients and
-/// monomials are the same, but ordering only depends on the monomials.
 ///
-/// This might not cause problems but I'm hesitant. I think its best to just specify how we want
-/// the terms to be ordered during the application, not as an intrinsic property
+/// Holds a coefficient and a monomial.
+///
 #[derive(Debug, Clone, PartialEq)]
 pub struct Term<P: PolyRing> {
     pub coeff: P::Coeff,
     pub mon: P::Mon,
 }
-
-use std::cmp::Ord;
 
 impl<P: PolyRing> Eq for Term<P> {}
 
@@ -179,15 +177,6 @@ impl<P: PolyRing> Term<P> {
     }
 }
 
-use num_traits::{One, Zero};
-
-impl<P: PolyRing> Mul for Term<P> {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self {
-        Term::new(self.coeff * other.coeff, self.mon.ref_add(&other.mon))
-    }
-}
 
 impl<P: PolyRing> Term<P> {
     pub fn zero() -> Self {
@@ -221,17 +210,24 @@ impl<P: PolyRing> One for Term<P> {
     }
 }
 
-impl<P: PolyRing> ClosedMul for Term<P> {}
+impl<P: PolyRing> Mul for Term<P> {
+    type Output = Self;
 
-impl<P: PolyRing> MyMulMonoid for Term<P> {
-    fn ref_mul(&self, other: &Self) -> Self {
+    fn mul(self, other: Self) -> Self {
         Term::new(self.coeff * other.coeff, self.mon.ref_add(&other.mon))
     }
 }
 
-impl<P: FPolyRing> EuclidDiv for Term<P> {
-    /// Euclidean division "self / other" returning a quotient and remainder.
-    /// Returns None if other is zero
+impl<P: PolyRing> ClosedMul for Term<P> {}
+
+// impl<P: PolyRing> MyMulMonoid for Term<P> {
+//     fn ref_mul(&self, other: &Self) -> Self {
+//         Term::new(self.coeff * other.coeff, self.mon.ref_add(&other.mon))
+//     }
+// }
+
+impl<P: FPolyRing> EuclideanDomain for Term<P> {
+
     fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
         if other.is_zero() {
             return None
@@ -241,28 +237,21 @@ impl<P: FPolyRing> EuclidDiv for Term<P> {
             None    => Some((Term::zero(), self.clone())),
         }
     }
-}
 
-impl<P: FPolyRing> Term<P> {
-    pub fn gcd(&self, other: &Self) -> Self {
+    fn gcd(&self, other: &Self) -> Self {
         Term::new(self.coeff.gcd(&other.coeff), self.mon.gcd(&other.mon))
     }
-    pub fn lcm(&self, other: &Self) -> Self {
-        Term::new(self.coeff.lcm(&other.coeff), self.mon.lcm(&other.mon))
-    }
 
-    /// Checks if "other divides self" i.e. "other | self".
-    /// ~PO Can be optimised if you really want to
-    pub fn divides(&self, other: &Self) -> Option<bool> {
-        self.euclid_div(other).map(|(_, r)| r.is_zero())
+    fn lcm(&self, other: &Self) -> Self {
+        Term::new(self.coeff.lcm(&other.coeff), self.mon.lcm(&other.mon))
     }
 }
 
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
 impl<'a, P: PolyRing> Poly<'a, P> {
-    //
+
     // A get_unchecked implementation
-    pub(crate) fn get_unchecked(&self, i: usize) -> &Term<P> {
+    pub fn get_unchecked(&self, i: usize) -> &Term<P> {
         unsafe { self.terms.get_unchecked(i) }
     }
 
@@ -270,7 +259,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     pub fn lt(&self) -> Term<P> {
         match self.num_terms() {
             0 => Term::zero(),
-            n => self.get_unchecked(n - 1).clone(),
+            _ => self.terms.last().clone(),
         }
     }
 
@@ -290,7 +279,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
         self.lt().mon
     }
 
-    /// Does a binary search for the term and returns the coefficient if
+    /// Does a binary search for the monomial and returns the coefficient if
     /// it was found and nonzero
     pub fn has(&self, t: &P::Mon) -> Option<P::Coeff> {
         match self.terms.binary_search_by(|a| <P::Ord>::cmp(&a.mon, &t)) {
@@ -300,10 +289,11 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
 }
 
-// The supertraits are here are so that I can use the derive macros
-// For some reason even though the MonOrd is going in a PhantomData it
-// still doesn't allow me to derive
-pub trait MonOrd: Clone + PartialEq + Debug + Eq + std::hash::Hash {
+/// The Monomial Ordering trait
+///
+/// Specifies how to compare monomials
+///
+pub trait MonOrd: Clone + Debug + std::hash::Hash {
     type Index: Monomial;
     fn cmp(a: &Self::Index, b: &Self::Index) -> Ordering;
 }
@@ -413,8 +403,9 @@ pub fn to_coeff_vec<P: PolyRing>(input: &[Term<P>], n: usize) -> Vec<P::Coeff> {
 impl<R: ScalarRing> Mul for DenseVec<R> {
     type Output = Self;
 
-    /// Basic n^2 multiplication algorithm
+    /// Basic n^2 multiplication algorithm using a vector
     fn mul(self, rhs: Self) -> Self::Output {
+
         let d_a = self.0.len() + 1;
         let d_b = rhs.0.len() + 1;
         let d_res = d_a + d_b - 1;
@@ -430,9 +421,13 @@ impl<R: ScalarRing> Mul for DenseVec<R> {
         }
 
         // Remove any remaining zeros on the end
-        while res.last().unwrap().is_zero() {
-            res.pop();
-        }
+        // This should be guaranteed not to panic on unwrap since 
+        let i = {
+            for i in d_res..0 {
+                if res[i] != 0 { break; }
+            }
+        };
+        res.resize(i, 0);
 
         DenseVec(res)
     }
@@ -440,6 +435,8 @@ impl<R: ScalarRing> Mul for DenseVec<R> {
 
 use std::collections::HashMap;
 
+/// Basic n^2 multiplication algorithm using a hashmap
+/// The hashmap allows this algorithm to be easily generalised to multivariate polynomials
 impl<'a, P: PolyRing> Mul for Poly<'a, P> {
     type Output = Self;
 
@@ -466,7 +463,7 @@ impl<'a, P: PolyRing> Mul for Poly<'a, P> {
 
 #[cfg(test)]
 mod tests {
-    extern crate test;
+    // extern crate test;
     use super::*;
     use crate::algebras::real::RR;
     use crate::parse::*;
@@ -489,7 +486,7 @@ mod tests {
 
         let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['x', 'y']);
 
-        let mut tester = Tester {
+        let tester = Tester {
             num_el: 5,
             deg_sizes: arr![usize; 2, 3],
             coeff_size: RR(10.0),
@@ -510,11 +507,11 @@ impl<'a, P: PolyRing> One for Poly<'a, P> {
 
 impl<'a, P: PolyRing> ClosedAdd for Poly<'a, P> {}
 
-impl<'a, P: PolyRing> MyAddMonoid for Poly<'a, P> {
-    fn ref_add(&self, other: &Self) -> Self {
-        Poly::elementwise_add(&self, &other, |a, b| a + b)
-    }
-}
+// impl<'a, P: PolyRing> MyAddMonoid for Poly<'a, P> {
+//     fn ref_add(&self, other: &Self) -> Self {
+//         Poly::elementwise_add(&self, &other, |a, b| a + b)
+//     }
+// }
 
 impl<'a, P: PolyRing> MyAddGroup for Poly<'a, P> {
     fn ref_sub(&self, other: &Self) -> Self {
@@ -524,11 +521,11 @@ impl<'a, P: PolyRing> MyAddGroup for Poly<'a, P> {
 
 impl<'a, P: PolyRing> ClosedMul for Poly<'a, P> {}
 // FIXME Needs optimisation
-impl<'a, P: PolyRing> MyMulMonoid for Poly<'a, P> {
-    fn ref_mul(&self, other: &Self) -> Self {
-        self.clone() * other.clone()
-    }
-}
+// impl<'a, P: PolyRing> MyMulMonoid for Poly<'a, P> {
+//     fn ref_mul(&self, other: &Self) -> Self {
+//         self.clone() * other.clone()
+//     }
+// }
 
 // Multiplication by a single term
 impl<'a, P: PolyRing> Mul<Term<P>> for &Poly<'a, P> {

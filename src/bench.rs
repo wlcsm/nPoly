@@ -54,24 +54,24 @@ impl Testable for ZZ {
     }
 }
 
-use crate::algebras::finite_field::FF;
+// use crate::algebras::finite_field::FF;
 
-#[derive(Clone, Copy, Debug)]
-pub struct DistFF(UniformInt<i32>);
+// #[derive(Clone, Copy, Debug)]
+// pub struct DistFF(UniformInt<i32>);
 
-impl Distribution<FF> for DistFF {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> FF {
-        FF(self.0.sample(rng))
-    }
-}
+// impl Distribution<FF> for DistFF {
+//     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> FF {
+//         FF(self.0.sample(rng))
+//     }
+// }
 
-impl Testable for FF {
-    type Sampler = DistFF;
+// impl Testable for FF {
+//     type Sampler = DistFF;
 
-    fn gen_sampler(max_size: Self) -> Self::Sampler {
-        DistFF(UniformInt::<i32>::new(-max_size.0.abs(), max_size.0.abs()))
-    }
-}
+//     fn gen_sampler(max_size: Self) -> Self::Sampler {
+//         DistFF(UniformInt::<i32>::new(-max_size.0.abs(), max_size.0.abs()))
+//     }
+// }
 
 #[derive(Clone, Copy, Debug)]
 pub struct DistRR(UniformFloat<f64>);
@@ -170,8 +170,245 @@ mod tests {
     use crate::polym::*;
     use crate::kronecker::*;
     use generic_array::*;
-    use typenum::{U2, U10};
+    use typenum::{U1, U2, U5, U10};
     use crate::algebras::MyMulMonoid;
+    use crate::fast_mult::karatsuba;
+
+    #[test]
+    fn kronecker_test() {
+
+        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['a', 'b']);
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 1000, 1000],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+
+        for i in [100usize, 250usize, 500usize, 750usize, 1000usize, 2000usize, 3000usize, 4000usize, 5000usize].iter() {
+            tester.num_el = *i;
+            let poly_a = make_poly(tester.clone());
+            let poly_b = make_poly(tester.clone());
+            let time = Duration::span(|| { 
+                let (poly_a_uni, poly_b_uni, kron_data) = kronecker(&poly_a, &poly_b);
+                to_multivar(poly_a_uni * poly_b_uni, &kron_data);
+            });
+
+            println!("Koronecker substitution {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+    }
+
+    #[test]
+    fn kronecker_test_five() {
+
+        let ring = PRDomain::<RR, GLex<MultiIndex<U5>>>::new(vec!['a', 'b', 'c', 'd', 'e']);
+
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 20, 20, 20, 20, 20],
+            coeff_size: RR(10.0),
+            mult_func: kronecker_mult,
+            ring: &ring,
+        };
+
+
+        for i in [100usize, 250usize, 500usize, 750usize, 1000usize, 2000usize, 3000usize, 4000usize, 5000usize].iter() {
+            tester.num_el = *i;
+            let poly_a = make_poly(tester.clone());
+            let poly_b = make_poly(tester.clone());
+            let time = Duration::span(|| { 
+                let (poly_a_uni, poly_b_uni, kron_data) = kronecker(&poly_a, &poly_b);
+                to_multivar(poly_a_uni * poly_b_uni, &kron_data);
+            });
+
+            println!("Keronecker substitution {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+    }
+
+    #[test]
+    fn kronecker_test_ten() {
+
+        let ring = PRDomain::<RR, GLex<MultiIndex<U10>>>::new(vec!['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']);
+
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+            coeff_size: RR(10.0),
+            mult_func: kronecker_mult,
+            ring: &ring,
+        };
+
+
+        for i in [100usize, 250usize, 500usize, 750usize, 1000usize, 2000usize, 3000usize, 4000usize, 5000usize].iter() {
+            tester.num_el = *i;
+            let poly_a = make_poly(tester.clone());
+            let poly_b = make_poly(tester.clone());
+            let time = Duration::span(|| { 
+                let (poly_a_uni, poly_b_uni, kron_data) = kronecker(&poly_a, &poly_b);
+                to_multivar(poly_a_uni * poly_b_uni, &kron_data);
+            });
+
+            println!("Kironecker substitution {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+    }
+
+    fn make_poly<'a, P: PolyRing<Coeff: Testable>>(tester: Tester<'a, P>) -> Poly<'a, P> {
+        let mut rng = rand::thread_rng();
+        let dist = <P::Coeff as Testable>::gen_sampler(tester.coeff_size);
+        Poly::from_terms((0..tester.num_el).map(|_| 
+                               Term {
+                                   coeff: dist.sample(&mut rng),
+                                   mon: tester.deg_sizes.iter()
+                                       .map(|i| rng.gen::<usize>() % i)
+                                       .collect()
+                               }).collect(), Some(tester.ring))
+    }
+
+    #[test]
+    fn schoolbook_uni_test() {
+        let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 100000],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        // let time = Duration::span(|| { a * b; });
+        println!("Time = {}", time);
+
+        for i in [5usize, 10usize, 50usize, 100usize, 500usize, 1000usize, 2000usize, 4000usize, 6000usize, 8000usize, 10000usize, 12000usize, 14000usize, 16000usize].iter() {
+            tester.num_el = *i;
+
+            let time = Poly::mult_tester(tester.clone());
+            println!("Schoolbook {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+
+    }
+
+    #[test]
+    fn schoolbook_one_test() {
+        let ring = PRDomain::<RR, GLex<MultiIndex<U1>>>::new(vec!['a']);
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 100000],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        // let time = Duration::span(|| { a * b; });
+        println!("Time = {}", time);
+
+        for i in [5usize, 10usize, 50usize, 100usize, 500usize, 1000usize].iter() {
+            tester.num_el = *i;
+
+            let time = Poly::mult_tester(tester.clone());
+            println!("Schoolbook {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+    }
+
+    #[test]
+    fn schoolbook_five_test() {
+        let ring = PRDomain::<RR, GLex<MultiIndex<U5>>>::new(vec!['a', 'b', 'c', 'd', 'e']);
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 20, 20, 20, 20, 20],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        // let time = Duration::span(|| { a * b; });
+        println!("Time = {}", time);
+
+        for i in [5usize, 10usize, 50usize, 100usize, 500usize, 1000usize].iter() {
+            tester.num_el = *i;
+
+            let time = Poly::mult_tester(tester.clone());
+            println!("Schoolbook {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+
+    }
+
+    #[test]
+    fn schoolbook_two_test() {
+        let ring = PRDomain::<RR, GLex<MultiIndex<U2>>>::new(vec!['a', 'b']);
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 1000, 1000],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        // let time = Duration::span(|| { a * b; });
+        println!("Time = {}", time);
+
+        for i in [5usize, 10usize, 50usize, 100usize, 500usize, 1000usize].iter() {
+            tester.num_el = *i;
+
+            let time = Poly::mult_tester(tester.clone());
+            println!("Schoolbook {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+
+    }
+    #[test]
+    fn schoolbook_test() {
+        let ring = PRDomain::<RR, GLex<MultiIndex<U10>>>::new(vec!['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']);
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+            coeff_size: RR(10.0),
+            mult_func: Poly::ref_mul,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        // let time = Duration::span(|| { a * b; });
+        println!("Time = {}", time);
+
+        for i in [5usize, 10usize, 50usize, 100usize, 500usize, 1000usize].iter() {
+            tester.num_el = *i;
+
+            let time = Poly::mult_tester(tester.clone());
+            println!("Schoolbook {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+
+    }
+
+    #[test]
+    fn karatsuba_test() {
+
+        let ring = PRDomain::<RR, UniVarOrder>::new(vec!['x']);
+
+        let mut tester = Tester {
+            num_el: 1000,
+            deg_sizes: arr![usize; 1000],
+            coeff_size: RR(10.0),
+            mult_func: karatsuba::karatsuba,
+            ring: &ring,
+        };
+
+        let time = Poly::mult_tester(tester.clone());
+        println!("Karatsuba time = {} microseconds", time.num_microseconds().unwrap());
+
+        for i in [5usize, 10usize, 20usize, 30usize, 50usize, 100usize, 500usize, 1000usize].iter() {
+            tester.num_el = *i;
+            tester.deg_sizes = arr![usize; *i];
+
+            let time = Poly::mult_tester(tester.clone());
+            println!("Karatsuba {} time = {} microseconds", tester.num_el, time.num_microseconds().unwrap());
+        }
+
+    }
 
     #[test]
     fn mult_tester_test() {
@@ -221,7 +458,7 @@ mod tests {
     fn bench_dense_main() {
         let ring = PRDomain::<CC, UniVarOrder>::new(vec!['x']);
 
-        let mut tester_big = Tester {
+        let tester_big = Tester {
             num_el: 1000,
             deg_sizes: arr![usize; 1000],
             coeff_size: CC::new(10.0, 10.0),
