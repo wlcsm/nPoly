@@ -1,8 +1,14 @@
 // This only does the base 2 FFT. For an arbitrary base, see "fft-mullti-base.rs"
 extern crate chrono;
 
+use crate::algebras::polyring::*;
 use crate::algebras::*;
-use crate::mathutils::log2_unchecked;
+use num_traits::Zero;
+
+// Note: Unchecked, assumes that n is a power of two
+fn log2_unchecked(n: usize) -> usize {
+    (n.trailing_zeros() + 1) as usize
+}
 
 pub trait SupportsFFT: ScalarField {
     // Generates the roots of unity
@@ -10,7 +16,52 @@ pub trait SupportsFFT: ScalarField {
     fn divby2(&mut self, n: usize);
 }
 
-// Warning: Does it infix by default for speed, infix on a_sig
+use num::Num;
+
+impl<T: ScalarField + Num+ PartialOrd + RemAssign> SupportsFFT for Complex<T> {
+    fn rou(n: usize, inv: bool) -> Vec<Self> {
+        unimplemented!()
+        }
+    fn divby2(&mut self, n: usize) {
+        unimplemented!()
+    }
+
+}
+
+use std::ops::RemAssign;
+impl<R: SupportsFFT + FFTnum + PartialOrd + RemAssign> Poly<Complex<R>, 1> {
+
+    /// Expands the input into a coefficient vector padded with zeros to length n
+    fn to_coeff_vec(input: &[Term<R, 1>], n: usize) -> Vec<R> {
+        let mut result: Vec<R> = Vec::with_capacity(n);
+        for Term { coeff, mon } in input.iter() {
+            // Fill the gap between monomials with zeros, then add the monomial
+            result.resize(mon.iter().sum(), R::zero());
+            result.push(*coeff);
+        }
+        // Pad the rest
+        result.resize(n, R::zero());
+        result
+    }
+
+    /// FFT Multiplication
+    fn fast_mult(&self, other: &Self) -> Self {
+        let n = (self.tot_deg() + other.tot_deg() + 1).next_power_of_two();
+
+        let mut a_sig = Poly::to_coeff_vec(&self.terms, n);
+        let mut b_sig = Poly::to_coeff_vec(&other.terms, n);
+
+        // Infix on a_sig
+        test_eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
+
+        // Convert back into polynomial type
+        Poly::from_coeff(self.ring.unwrap(), a_sig)
+    }
+}
+
+/// Performs the evaluation-interpolation technique on two slices using the FFT.
+/// Coefficient algebra must support a radix two FFT.
+/// Warning: Mutates the original data.
 pub fn eval_interp<F>(a_sig: &mut [F], b_sig: &mut [F]) -> Result<(), &'static str>
 where
     F: SupportsFFT,
@@ -23,8 +74,8 @@ where
     }
 
     // Evaluate the polynomials
-    perform_fft(a_sig, false)?;
-    perform_fft(b_sig, false)?;
+    fft(a_sig, false)?;
+    fft(b_sig, false)?;
 
     // Multiply elementwise
     for i in 0..n {
@@ -32,10 +83,58 @@ where
     }
 
     // Interpolate the result
-    perform_fft(a_sig, true)?;
+    fft(a_sig, true)?;
+
+    // Need to normalise it here
+    for x in a_sig.iter_mut() {
+        x.divby2(log2_unchecked(n))
+    }
+
     Ok(())
 }
 
+use num::complex::Complex;
+use rustfft::{FFTnum, FFTplanner};
+use std::ops::Div;
+
+use num::integer::Roots;
+
+pub fn test_eval_interp<T: FFTnum + Div<usize, Output = T>>(
+    a_sig: &mut [Complex<T>],
+    b_sig: &mut [Complex<T>],
+) -> Result<(), &'static str> {
+    let n = a_sig.len();
+
+    let mut tmp: Vec<Complex<T>> = vec![Zero::zero(); n];
+
+    let mut planner = FFTplanner::new(false);
+    let fft = planner.plan_fft(n);
+
+    fft.process(a_sig, &mut tmp);
+    fft.process(b_sig, a_sig);
+
+    // Multiply elementwise
+    for i in 0..n {
+        tmp[i] = tmp[i] + a_sig[i];
+    }
+
+    let mut planner = FFTplanner::new(true);
+    let fft = planner.plan_fft(n);
+
+    fft.process(&mut tmp, a_sig);
+
+    // Normalise output
+    let n_sqrt = n.sqrt();
+
+    for x in a_sig.iter_mut() {
+        *x = Complex::new(x.re / n_sqrt, x.im / n_sqrt)
+    }
+
+    Ok(())
+}
+
+/// Standard DFT Procedure
+/// Warning: Performed infix
 pub fn dft<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     let n = signal.len();
     let result = signal.to_vec();
@@ -56,11 +155,11 @@ pub fn dft<F: SupportsFFT>(signal: &mut [F], inv: bool) {
     }
 }
 
-pub fn perform_fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'static str> {
-    // Sample is the signal. Performs the FFT inline
-    // Does not normalise the inverse!
-
-    // Basic contraint checking
+/// Performs the standard Cooley-Tukey FFT.
+/// If "inv" is true, then it will perform an inverse FFT
+/// Advantage of this one is that it doesn't need to be a complex number, the coefficients simply
+/// need to support an FFT in that they admit roots of unity.
+fn fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'static str> {
     match signal.len() {
         0 => Err("Signal cannot be empty"),
         n if !n.is_power_of_two() => Err("Signal needs to be a power of two"),
@@ -75,9 +174,8 @@ pub fn perform_fft<F: SupportsFFT>(signal: &mut [F], inv: bool) -> Result<(), &'
     }
 }
 
-pub fn go_fast<F: SupportsFFT>(sig: &mut [F], inv: bool) {
-    // Assumes that the length of 'sig' is >= 4
-
+/// Performs the classical FFT procedure in a bottom up fashion
+fn go_fast<F: SupportsFFT>(sig: &mut [F], inv: bool) {
     let n = sig.len();
     let rou = <F>::rou(n, inv); // Generates roots of unity
 
@@ -114,66 +212,63 @@ pub fn go_fast<F: SupportsFFT>(sig: &mut [F], inv: bool) {
 
 #[cfg(test)]
 mod tests {
-    extern crate chrono;
-    extern crate rand;
+    //    extern crate chrono;
+    //    extern crate rand;
+    //
+    //    use crate::algebras::polyring::*;
+    //    use chrono::*;
+    //
+    //    use super::fft;
+    //    use rand::distributions::{Distribution, Uniform};
 
-    use crate::algebras::complex::CC;
-    use crate::algebras::polyring::*;
-    use crate::fast_mult::*;
-    use crate::polyu::*;
-    use chrono::*;
+    //    #[test]
+    //    fn fft_test() {
+    //        let mut sig = vec![
+    //            CC::from_re(9),
+    //            CC::from_re(3),
+    //            CC::from_re(3),
+    //            CC::from_re(6),
+    //        ];
+    //        let _ = fft(&mut sig[..], false);
+    //
+    //        println!("{:?}", sig)
+    //    }
 
-    use super::perform_fft;
-    use rand::distributions::{Distribution, Uniform};
-
-    #[test]
-    fn fft_test() {
-        let mut sig = vec![
-            CC::from_re(9),
-            CC::from_re(3),
-            CC::from_re(3),
-            CC::from_re(6),
-        ];
-        let _ = perform_fft(&mut sig[..], false);
-
-        println!("{:?}", sig)
-    }
-
-    // TODO I'm not sure this is correctly working, I changed the =log2_unchecked to log2_unchecked
-    #[test]
-    fn bench_dense_main() {
-        let ring = PRDomain::<CC, UniVarOrder>::new(vec!['x']);
-
-        // Note all coefficients are nonzero
-        let dist = Uniform::from(1..100);
-        let mut rng = rand::thread_rng();
-        // A function to randomly generate a polynomial with n coefficients
-        let mut make_poly = |n: usize| -> PolyU<CC> {
-            let res_vec = (0..n).map(|_| CC::from_re(dist.sample(&mut rng))).collect();
-            Poly::from_coeff(&ring, res_vec)
-        };
-
-        // Benches the time required to multiply two arbitrary polynomials of deg = n
-        let mut time_mult = |n: usize| {
-            let a = make_poly(n);
-            let b = make_poly(n);
-
-            println!("-------------------------------------------");
-            println!("Number of elements = {}", n);
-            println!("-------------------------------------------");
-            println!(
-                "FFT: {:?}",
-                Duration::span(|| {
-                    a.fast_mult(&b);
-                })
-            );
-            println!("-------------------------------------------");
-        };
-
-        for i in 5..16 {
-            time_mult(1 << i);
-        }
-    }
+    //    // TODO I'm not sure this is correctly working, I changed the =log2_unchecked to log2_unchecked
+    //    #[test]
+    //    fn bench_dense_main() {
+    //        let ring = PRDomain::<CC, UniVarOrder>::new(vec!['x']);
+    //
+    //        // Note all coefficients are nonzero
+    //        let dist = Uniform::from(1..100);
+    //        let mut rng = rand::thread_rng();
+    //        // A function to randomly generate a polynomial with n coefficients
+    //        let mut make_poly = |n: usize| -> PolyU<CC> {
+    //            let res_vec = (0..n).map(|_| CC::from_re(dist.sample(&mut rng))).collect();
+    //            Poly::from_coeff(&ring, res_vec)
+    //        };
+    //
+    //        // Benches the time required to multiply two arbitrary polynomials of deg = n
+    //        let mut time_mult = |n: usize| {
+    //            let a = make_poly(n);
+    //            let b = make_poly(n);
+    //
+    //            println!("-------------------------------------------");
+    //            println!("Number of elements = {}", n);
+    //            println!("-------------------------------------------");
+    //            println!(
+    //                "FFT: {:?}",
+    //                Duration::span(|| {
+    //                    a.fast_mult(&b);
+    //                })
+    //            );
+    //            println!("-------------------------------------------");
+    //        };
+    //
+    //        for i in 5..16 {
+    //            time_mult(1 << i);
+    //        }
+    //    }
 
     // #[test]
     // fn mult_test_main() {

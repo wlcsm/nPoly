@@ -1,0 +1,204 @@
+/// Multivariate polynomials
+///
+/// Most importantly it defines the MultiIndex struct which holds terms with multiple
+/// indeterminates
+use crate::algebras::polyring::*;
+use generic_array::*;
+use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::ops::{Add, AddAssign};
+
+/// A general multiindex monomial
+#[derive(Clone, Debug, Hash)]
+pub struct MultiIndex<N: VarNum> {
+    total: usize,
+    indices: GenericArray<usize, N>,
+}
+
+impl<N: VarNum> PartialEq for MultiIndex<N> {
+    fn eq(&self, other: &Self) -> bool {
+        self.total == other.total && self.indices == other.indices
+    }
+}
+
+impl<N: VarNum> Eq for MultiIndex<N> {}
+
+/// Constructor
+impl<N: VarNum> MultiIndex<N> {
+    fn new(indices: GenericArray<usize, N>) -> Self {
+        MultiIndex {
+            total: indices.iter().sum(),
+            indices,
+        }
+    }
+}
+
+// TODO; Make this a macro to do all of them
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+pub struct GLex<I: Monomial>(PhantomData<I>);
+
+//impl<I: Monomial> MonOrd for GLex<I> {
+//    type Index = I;
+//
+//    fn cmp(itema: &I, itemb: &I) -> Ordering {
+//        match itema.tot_deg().cmp(&itemb.tot_deg()) {
+//            Ordering::Equal => itema.lex(itemb),
+//            ord => ord,
+//        }
+//    }
+//}
+
+fn binary_monomial_map<N: VarNum>(
+    lhs: &MultiIndex<N>,
+    rhs: &MultiIndex<N>,
+    map: fn(usize, usize) -> usize,
+) -> MultiIndex<N> {
+    MultiIndex::new(
+        lhs.indices
+            .iter()
+            .zip(rhs.indices.iter())
+            .map(|(a, b)| map(*a, *b))
+            .collect(),
+    )
+}
+
+impl<N: VarNum> Add for MultiIndex<N> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        binary_monomial_map(&self, &other, |a, b| a + b)
+    }
+}
+
+impl<N: VarNum> AddAssign<Self> for MultiIndex<N> {
+    fn add_assign(&mut self, other: Self) {
+        for (a, b) in self.indices.iter_mut().zip(other.indices.iter()) {
+            *a += b
+        }
+    }
+}
+
+use num_traits::Zero;
+impl<N: VarNum> Zero for MultiIndex<N> {
+    fn zero() -> Self {
+        Self::new(GenericArray::default())
+    }
+    fn is_zero(&self) -> bool {
+        self.total.is_zero()
+    }
+}
+
+impl<N: VarNum> IntoIterator for MultiIndex<N> {
+    type Item = usize;
+    type IntoIter = GenericArrayIter<usize, N>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.indices.into_iter()
+    }
+}
+
+
+use std::iter::Iterator;
+
+impl<N: VarNum> std::iter::FromIterator<usize> for MultiIndex<N> {
+    fn from_iter<I: IntoIterator<Item = usize>>(iter: I) -> Self {
+
+        let mut total = 0;
+        let indices: GenericArray<usize, N> = iter
+            .into_iter()
+            .map(|m| {
+                total += m;
+                m
+            })
+            .collect();
+
+        MultiIndex { total, indices }
+    }
+}
+
+use crate::algebras::*;
+use std::cmp::{min, max};
+
+impl<N: VarNum> EuclideanDomain for MultiIndex<N> {
+    fn gcd(&self, other: &Self) -> Self {
+        binary_monomial_map(self, other, |a, b| min(a, b))
+    }
+    fn lcm(&self, other: &Self) -> Self {
+        binary_monomial_map(self, other, |a, b| max(a, b))
+    }
+
+    fn euclid_div(&self, other: &Self) -> (Self, Self) { 
+        // TODO Come back
+        unimplemented!()
+//        let mut res = MultiIndex::zero();
+//        let mut i = 0;
+//        for (a, b) in self.indices.iter().zip(other.indices.iter()) {
+//            if b <= a {
+//                res.indices[i] = a - b
+//            } else {
+//                return None;
+//            }
+//            i += 1;
+//        }
+//        Some(res)
+    }
+}
+
+impl<N: VarNum> Monomial for MultiIndex<N> {
+    type NumVar = N;
+
+    fn tot_deg(&self) -> usize {
+        self.total
+    }
+
+    fn get(&self, ind: usize) -> Option<&usize> {
+        self.indices.get(ind)
+    }
+}
+
+use std::fmt;
+
+// Problem is that it's hard to put an ordering on the coefficients because in finite fields
+// thats quite ambiguous. I need it in the "if x < 0" line
+// This will eventually have to be overcome some time.
+impl<'a, P: PolyRing> fmt::Display for Poly<'a, P> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Because we don't want a potential "+" out the front of the first term
+        if self.is_zero() {
+            write!(f, "{}", <P::Coeff>::zero())
+        } else {
+            let mut acc: String = show_term(&self.terms[0], &self.ring);
+
+            self.terms
+                .iter()
+                .skip(1)
+                .for_each(|x| acc.push_str(&format!(" + {}", show_term(x, &self.ring))));
+
+            write!(f, "{}", acc)
+        }
+    }
+}
+
+pub fn show_term<'a, P: PolyRing>(term: &Term<P>, ring: &Option<&P>) -> String {
+    let mut acc = term.coeff.to_string();
+
+    // Add the extra variables if it is in a defined ring
+    match ring {
+        Some(r) => {
+            for (i, symb) in r.symb().iter().enumerate() {
+                match term.mon.get(i).unwrap() {
+                    0 => {}
+                    1 => acc.push(*symb),
+                    d => acc.push_str(&format!("{}^{}", symb, d)),
+                }
+            }
+        }
+        // Can only be a univariate polynomial
+        None => match term.mon.get(0).unwrap() {
+            0 => {}
+            1 => acc.push('?'),
+            d => acc.push_str(&format!("?^{}", d)),
+        },
+    }
+    acc
+}

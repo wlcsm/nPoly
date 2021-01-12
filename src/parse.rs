@@ -19,46 +19,6 @@ pub trait MyFromStr<'a, P: PolyRing>: Sized {
     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err>;
 }
 
-// TODO implement this
-// impl<'a, P: PolyRing> MyFromStr<'a, P> for Term<P> {
-//     type Err = PolyErr;
-
-//     fn from_str(ring: &'a P, s: &str) -> Result<Self, Self::Err> {
-
-//         let mono = String::new();
-//         let mono_named = String::new();
-
-//         // Build the named and unnamed regexes
-//         for s in ring.symb() {
-//             mono.push_str(&format!(r"({var}\^\d*)?", var = s));
-//             mono_named.push_str(&format!(r"(?:{var}\^(?P<{var}>\d*))?", var = s));
-//         }
-
-//         if !mono.is_match(s) {
-//             Err(PolyErr::ParsePolyError)
-//         } else {
-//             let mut acc = Vec::new();
-//             for caps in mono_named.captures_iter(s) {
-
-//                 // Extract the indices of the indeterminates in the term
-//                 let mut degrees = P::Mon::zero();
-//                 for (i, symb) in ring.symb().iter().enumerate() {
-//                     if let Some(n) = caps.name(symb.to_string().as_str()) {
-//                         degrees.set(
-//                             i,
-//                             n.as_str()
-//                                 .parse::<usize>()
-//                                 .map_err(|_| PolyErr::ParsePolyError)?,
-//                         );
-//                     }
-//                 }
-//                 acc.push(Monomial::new(degrees))
-//             }
-//             // println!("acc = {:?}", acc);
-//             Ok(Poly::<'a, P>::from_terms(acc, Some(ring)))
-//         }
-//     }
-// }
 impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
     type Err = PolyErr;
 
@@ -74,6 +34,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 
         // Validates the entire thing
         let whole_regex = Regex::new(&format!(r"^{m}(\s*(\+|-)\s*{m})*$", m = mono)).unwrap();
+
         // Parse each term. The "?" is in there for the first term which might not have a + or -,
         // all the other terms are guarenteed to have one because it is checked in the whole_regex
         let term_regex = Regex::new(&format!(r"(?P<sign>\+|-)?\s*{}", mono_named)).unwrap();
@@ -91,7 +52,7 @@ impl<'a, P: PolyRing> MyFromStr<'a, P> for Poly<'a, P> {
 
                 // Take into account if it is a subtraction
                 if let Some("-") = caps.name("sign").map(|c| c.as_str()) {
-                    coeff = -coeff;
+                    coeff = P::Coeff::zero() - coeff;
                 }
 
                 // Extract the indices of the interminates in the term
@@ -119,7 +80,6 @@ mod tests {
     use super::*;
     use crate::algebras::integers::ZZ;
     use crate::polym::*;
-    // use crate::polyu::*;
     use generic_array::typenum::U2;
 
     #[test]

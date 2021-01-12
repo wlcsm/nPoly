@@ -1,7 +1,16 @@
 use crate::algebras::polyring::*;
-use crate::display::*;
 use crate::ideals::*;
 use num_traits::Zero;
+
+fn show_vec_poly<'a, P: PolyRing>(poly: &Vec<Poly<'a, P>>) -> String {
+    format!(
+        "[\n {} \n ]",
+        poly.iter()
+            .map(|p| format!("{}", p))
+            .collect::<Vec<String>>()
+            .join("\n")
+    )
+}
 
 /// Converts the generators into a Groebner basis using the F4 algorithm
 /// Psuedocode in CLO

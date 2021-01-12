@@ -1,8 +1,29 @@
 extern crate chrono;
 
-use crate::mathutils::*;
+use mathutils::*;
 use crate::algebras::*;
 
+mod mathutils {
+    pub fn logn(num: usize, n: usize) -> usize {
+        if num < n {
+            0
+        } else {
+            logn(num / n, n) + 1
+        }
+    }
+
+    pub fn is_n_pow(num: usize, n: usize) -> bool {
+        n.pow(logn(num, n) as u32) == num
+    }
+
+    pub fn next_npow(num: usize, n: usize) -> usize {
+        if is_n_pow(num, n) {
+            num
+        } else {
+            n.pow((logn(num, n) + 1) as u32)
+        }
+    }
+}
 
 pub fn perform_fft_multi<T: SupportsFFT>(signal: &mut [T], inv: bool, base: usize) -> Result<(), &'static str> {
     // Sample is the signal. Performs the FFT inline

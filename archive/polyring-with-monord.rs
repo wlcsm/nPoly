@@ -5,16 +5,15 @@ use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-// <><><><><><><><><><> Poly Ring Domain <><><><><><><><><><> //
-// I made this a trait because I plan to optimise for quotient rings later
-// on.
+// Polynomial Ring Domain
 pub trait PolyRing: Eq + PartialEq + Clone + std::fmt::Debug {
     type Coeff: ScalarRing;
-    type Ord: MonOrd<Index = Self::Mon>;
+    //type Ord: MonOrd<Index = Self::Mon>;
     type Mon: Monomial<NumVar = Self::NumVar>;
     type NumVar: VarNumber;
     fn symb(&self) -> Vec<char>;
 }
+
 pub trait VarNumber: ArrayLength<usize> + Eq + PartialEq + Clone + Debug + std::hash::Hash {}
 
 // Super trait for a polynomial whose coefficients are in a field
@@ -119,10 +118,12 @@ pub struct Poly<'a, P: PolyRing> {
     pub(crate) ring: Option<&'a P>,
 }
 
-/// The coefficient vector only holds the coefficients as you would expect in a dense
-/// representation. It assumes that everything to convert it into coefficients has been done
-/// correctly, like Kronecker substitution etc
-pub struct DenseVec<R: ScalarRing>(Vec<R>);
+#[derive(Debug, Clone, PartialEq)]
+pub struct PolyDense<'a, P: PolyRing> {
+    pub(crate) terms: Vec<P::Coeff>,
+    pub(crate) ring: Option<&'a P>,
+}
+
 
 impl<'a, P: PolyRing> Poly<'a, P> {
     /// Returns a polynomial from a vector of terms.
@@ -130,23 +131,38 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     /// ~PO We create no_dup and sorted, could look at only operating on the same piece of memory
     /// for space efficiency.
     pub fn from_terms(terms: Vec<Term<P>>, ring: Option<&'a P>) -> Poly<'a, P> {
+
         // Remove zero terms then sort
         let mut sorted: Vec<Term<P>> = terms.into_iter().filter(|x| !x.is_zero()).collect();
         sorted.sort_by(|a, b| <P::Ord>::cmp(&a.mon, &b.mon));
 
         // Remove duplicates
-        let mut no_dup: Vec<Term<P>> = Vec::with_capacity(sorted.len());
-        for el in sorted {
-            if let Some(last) = no_dup.last_mut() {
-                if el.mon == last.mon {
-                    last.coeff = last.coeff + el.coeff;
-                    continue;
-                }
-            }
-            no_dup.push(el)
-        }
+        // TODO Test which is faster
+//        let mut no_dup: Vec<Term<P>> = Vec::with_capacity(sorted.len());
+//        for el in sorted {
+//            if let Some(last) = no_dup.last_mut() {
+//                if el.mon == last.mon {
+//                    last.coeff = last.coeff + el.coeff;
+//                    continue;
+//                }
+//            }
+//            no_dup.push(el)
+//        }
+
+
+        let mut last = Term::zero();
+        let no_dup = sorted.into_iter().filter_map(|a| 
+                                      if a.mon == last.mon { 
+                                          last.coeff += a.coeff; 
+                                          None 
+                                      } else { 
+                                          let tmp = last.clone(); 
+                                          last = a;
+                                          Some(tmp) 
+                                      }).collect();
 
         Poly::from_terms_unchecked(no_dup, ring)
+
     }
 
     pub fn from_terms_unchecked(terms: Vec<Term<P>>, ring: Option<&'a P>) -> Poly<'a, P> {
@@ -154,109 +170,32 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
 }
 
-// <><><><><><><><><><> Term <><><><><><><><><><> //
-/// The Term struct.
-/// It holds a coefficient and a monomial, both are generic.
-/// Terms are not ordered but monomials are.
-/// This is because two terms should be equal if and only if both their coefficients and
-/// monomials are the same, but ordering only depends on the monomials.
-///
-/// This might not cause problems but I'm hesitant. I think its best to just specify how we want
-/// the terms to be ordered during the application, not as an intrinsic property
-#[derive(Debug, Clone, PartialEq)]
-pub struct Term<P: PolyRing> {
-    pub coeff: P::Coeff,
-    pub mon: P::Mon,
-}
-
-use std::cmp::Ord;
-
-impl<P: PolyRing> Eq for Term<P> {}
-
-impl<P: PolyRing> Term<P> {
-    pub fn new(coeff: P::Coeff, mon: P::Mon) -> Self {
-        Term { coeff, mon }
+/// Evaluate the polynomial at some value
+impl<'a, P: PolyRing> PolyDense<'a, P> {
+    fn eval(&self, val: P::Coeff) -> P::Coeff {
+        self.terms.rev().fold(P::Coeff::zero(), |acc, t| {
+            acc * val + t
+        })
     }
 }
 
-use num_traits::{One, Zero};
-
-impl<P: PolyRing> Mul for Term<P> {
-    type Output = Self;
-
-    fn mul(self, other: Self) -> Self {
-        Term::new(self.coeff * other.coeff, self.mon.ref_add(&other.mon))
+// TODO Not the best
+impl<'a, P: PolyRing> MulAssign for Poly<'a, P> {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = self.clone() * rhs
     }
 }
 
-impl<P: PolyRing> Term<P> {
-    pub fn zero() -> Self {
-        Term::new(P::Coeff::zero(), P::Mon::zero())
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.coeff.is_zero()
-    }
-}
-
-impl<P: PolyRing> Neg for Term<P> {
-    type Output = Self;
-
-    fn neg(self) -> Self {
-        Term::new(-self.coeff, self.mon.clone())
-    }
-}
-
-impl<P: PolyRing> Neg for &Term<P> {
-    type Output = Term<P>;
-
-    fn neg(self) -> Term<P> {
-        Term::new(-self.coeff, self.mon.clone())
-    }
-}
-
-impl<P: PolyRing> One for Term<P> {
-    fn one() -> Self {
-        Term::new(P::Coeff::one(), P::Mon::zero())
-    }
-}
-
-impl<P: PolyRing> ClosedMul for Term<P> {}
-
-impl<P: PolyRing> MyMulMonoid for Term<P> {
-    fn ref_mul(&self, other: &Self) -> Self {
-        Term::new(self.coeff * other.coeff, self.mon.ref_add(&other.mon))
-    }
-}
-
-impl<P: FPolyRing> EuclidDiv for Term<P> {
-    /// Euclidean division "self / other" returning a quotient and remainder.
-    /// Returns None if other is zero
-    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
-        if other.is_zero() {
-            return None
-        } 
-        match self.mon.div(&other.mon) {
-            Some(q) => Some((Term::new(self.coeff / other.coeff, q), Term::zero())),
-            None    => Some((Term::zero(), self.clone())),
-        }
-    }
-}
-
-impl<P: FPolyRing> Term<P> {
-    pub fn gcd(&self, other: &Self) -> Self {
-        Term::new(self.coeff.gcd(&other.coeff), self.mon.gcd(&other.mon))
-    }
-    pub fn lcm(&self, other: &Self) -> Self {
-        Term::new(self.coeff.lcm(&other.coeff), self.mon.lcm(&other.mon))
-    }
-
-    /// Checks if "other divides self" i.e. "other | self".
-    /// ~PO Can be optimised if you really want to
-    pub fn divides(&self, other: &Self) -> Option<bool> {
-        self.euclid_div(other).map(|(_, r)| r.is_zero())
-    }
-}
+//impl<'a, P: PolyRingUni> PolyU<'a, P> {
+//    fn eval(&self, val: P::Coeff) -> P::Coeff {
+//
+//        let prev = 
+//        self.terms.rev().fold(P::Coeff::zero(), |acc, t| {
+//            (acc + t.coeff) * val.exp(
+//
+//
+//    }
+//}
 
 // <><><><><><><><><><> General Polynomial Functions <><><><><><><><><><> //
 impl<'a, P: PolyRing> Poly<'a, P> {
@@ -300,17 +239,111 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     }
 }
 
+
+
+// <><><><><><><><><><> Term <><><><><><><><><><> //
+/// The Term struct.
+/// It holds a coefficient and a monomial, both are generic.
+/// Terms are not ordered but monomials are.
+/// This is because two terms should be equal if and only if both their coefficients and
+/// monomials are the same, but ordering only depends on the monomials.
+///
+/// This might not cause problems but I'm hesitant. I think its best to just specify how we want
+/// the terms to be ordered during the application, not as an intrinsic property
+#[derive(Debug, Clone, PartialEq)]
+pub struct Term<P: PolyRing> {
+    pub coeff: P::Coeff,
+    pub mon: P::Mon,
+}
+
+//use std::cmp::Ord;
+
+impl<P: PolyRing> Eq for Term<P> {}
+
+impl<P: PolyRing> Term<P> {
+    pub fn new(coeff: P::Coeff, mon: P::Mon) -> Self {
+        Term { coeff, mon }
+    }
+}
+
+use num_traits::{One, Zero};
+use std::ops::{Mul, Add, Sub, MulAssign};
+
+impl<P: PolyRing> Mul for Term<P> {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        Term::new(self.coeff * other.coeff, self.mon + other.mon)
+    }
+}
+
+impl<P: PolyRing> MulAssign for Term<P> {
+    fn mul_assign(&mut self, other: Self) {
+        self.coeff *= other.coeff;
+        self.mon += other.mon;
+    }
+}
+
+impl<P: PolyRing> Term<P> {
+    pub fn zero() -> Self {
+        Term::new(P::Coeff::zero(), P::Mon::zero())
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.coeff.is_zero()
+    }
+}
+
+impl<P: PolyRing> One for Term<P> {
+    fn one() -> Self {
+        Term::new(P::Coeff::one(), P::Mon::zero())
+    }
+}
+
+
+//impl<P: FPolyRing> EuclidDiv for Term<P> {
+//    /// Euclidean division "self / other" returning a quotient and remainder.
+//    /// Returns None if other is zero
+//    fn euclid_div(&self, other: &Self) -> Option<(Self, Self)> {
+//        if other.is_zero() {
+//            return None
+//        } 
+//        match self.mon.div(&other.mon) {
+//            Some(q) => Some((Term::new(self.coeff / other.coeff, q), Term::zero())),
+//            None    => Some((Term::zero(), self.clone())),
+//        }
+//    }
+//}
+//
+//impl<P: FPolyRing> Term<P> {
+//    pub fn gcd(&self, other: &Self) -> Self {
+//        Term::new(self.coeff.gcd(&other.coeff), self.mon.gcd(&other.mon))
+//    }
+//    pub fn lcm(&self, other: &Self) -> Self {
+//        Term::new(self.coeff.lcm(&other.coeff), self.mon.lcm(&other.mon))
+//    }
+//
+//    /// Checks if "other divides self" i.e. "other | self".
+//    /// ~PO Can be optimised if you really want to
+//    pub fn divides(&self, other: &Self) -> Option<bool> {
+//        self.euclid_div(other).map(|(_, r)| r.is_zero())
+//    }
+//}
+
+
 // The supertraits are here are so that I can use the derive macros
 // For some reason even though the MonOrd is going in a PhantomData it
 // still doesn't allow me to derive
-pub trait MonOrd: Clone + PartialEq + Debug + Eq + std::hash::Hash {
-    type Index: Monomial;
-    fn cmp(a: &Self::Index, b: &Self::Index) -> Ordering;
-}
+//pub trait MonOrd: Clone + PartialEq + Debug + Eq + std::hash::Hash {
+//    type Index: Monomial;
+//    fn cmp(a: &Self::Index, b: &Self::Index) -> Ordering;
+//}
 
 pub trait Monomial:
     IntoIterator<Item = usize, IntoIter = GenericArrayIter<usize, <Self as Monomial>::NumVar>>
-    + MyAddMonoid
+    + Zero
+    + Clone
+    + EuclideanDomain
     + Eq
     + Debug
     + std::hash::Hash
@@ -319,71 +352,27 @@ pub trait Monomial:
     type NumVar: VarNumber;
 
     fn get(&self, ind: usize) -> Option<&usize>;
-    fn set(&mut self, ind: usize, val: usize) -> Option<()>;
     fn tot_deg(&self) -> usize;
-
-    fn gcd(&self, other: &Self) -> Self;
-    fn lcm(&self, other: &Self) -> Self;
-
-    fn lex(&self, other: &Self) -> Ordering;
-
-    fn div(&self, other: &Self) -> Option<Self>;
-
-    fn divides(&self, other: &Self) -> Option<bool> {
-        Some(self.div(other).is_some())
-    }
-    // FIXME This returns None it is isn't divisble and if other is zero
-    // there should be something to distinguish these two cases
 }
 
+/// Implements basic arithmetic operations
+#[macro_export]
+macro_rules! impl_arithmetic {
+    ($op_trait:ident, $op_func:ident, $op_type:ty, $op_symb:expr) => {
+        impl<'a, P: PolyRing>  $op_trait for $op_type {
+            type Output = Poly<'a, P>;
 
-impl<'a, P: PolyRing> Add for &Poly<'a, P> {
-    type Output = Poly<'a, P>;
-
-    fn add(self, other: Self) -> Poly<'a, P> {
-        Poly::elementwise_add(self, other, |a, b| a + b)
+            fn $op_func(self, other: Self) -> Poly<'a, P> {
+                Poly::elementwise_map(&self, &other, |a, b| $op_symb)
+            }
+        }
     }
 }
 
-impl<'a, P: PolyRing> Add for Poly<'a, P> {
-    type Output = Poly<'a, P>;
-
-    fn add(self, other: Self) -> Poly<'a, P> {
-        Poly::elementwise_add(&self, &other, |a, b| a + b)
-    }
-}
-
-impl<'a, P: PolyRing> Sub for &Poly<'a, P> {
-    type Output = Poly<'a, P>;
-
-    fn sub(self, other: Self) -> Poly<'a, P> {
-        Poly::elementwise_add(self, other, |a, b| a - b)
-    }
-}
-
-impl<'a, P: PolyRing> Sub for Poly<'a, P> {
-    type Output = Poly<'a, P>;
-
-    fn sub(self, other: Self) -> Poly<'a, P> {
-        Poly::elementwise_add(&self, &other, |a, b| a - b)
-    }
-}
-
-impl<'a, P: PolyRing> Neg for &Poly<'a, P> {
-    type Output = Poly<'a, P>;
-
-    fn neg(self) -> Poly<'a, P> {
-        self.elementwise_map(|t| t.neg())
-    }
-}
-
-impl<'a, P: PolyRing> Neg for Poly<'a, P> {
-    type Output = Poly<'a, P>;
-
-    fn neg(self) -> Poly<'a, P> {
-        self.elementwise_map(|t| t.neg())
-    }
-}
+impl_arithmetic![Add, add, Poly , a + b];
+impl_arithmetic![Add, add, &Poly, a + b];
+impl_arithmetic![Sub, sub, Poly , a - b];
+impl_arithmetic![Sub, sub, &Poly, a - b];
 
 impl<'a, P: PolyRing> Zero for Poly<'a, P> {
     fn zero() -> Self {
@@ -397,20 +386,8 @@ impl<'a, P: PolyRing> Zero for Poly<'a, P> {
     }
 }
 
-/// Expands the input into a coefficient vector padded with zeros to length n
-pub fn to_coeff_vec<P: PolyRing>(input: &[Term<P>], n: usize) -> Vec<P::Coeff> {
-    let mut result: Vec<P::Coeff> = Vec::with_capacity(n);
-    for Term { coeff, mon } in input.iter() {
-        // Fill the gap between monomials with zeros, then add the monomial
-        result.resize(mon.tot_deg(), <P::Coeff>::zero());
-        result.push(*coeff);
-    }
-    // Pad the rest
-    result.resize(n, <P::Coeff>::zero());
-    result
-}
 
-impl<R: ScalarRing> Mul for DenseVec<R> {
+impl<R: ScalarRing> Mul for PolyDense<R> {
     type Output = Self;
 
     /// Basic n^2 multiplication algorithm
@@ -434,35 +411,38 @@ impl<R: ScalarRing> Mul for DenseVec<R> {
             res.pop();
         }
 
-        DenseVec(res)
+        Dense(res)
     }
 }
 
-use std::collections::HashMap;
 
-impl<'a, P: PolyRing> Mul for Poly<'a, P> {
-    type Output = Self;
+//use std::collections::HashMap;
+//
+//impl<'a, P: PolyRing> Mul for Poly<'a, P> {
+//    type Output = Self;
+//
+//    fn mul(self, rhs: Self) -> Self::Output {
+//        if self.ring != rhs.ring {
+//            panic!("Can't multiply polynomials in different rings yet");
+//        }
+//
+//        let mut res_hash = HashMap::<P::Mon, P::Coeff>::new();
+//
+//        for (a, b) in iproduct!(self.terms, rhs.terms) {
+//            // Inserts the value into the hashmap if empty, or adds it to the current value if not
+//            let Term { coeff: c, mon: m } = a * b;
+//            res_hash.entry(m).and_modify(|v| *v += c).or_insert(c);
+//        }
+//
+//        let mut res_vec: Vec<Term<P>> =
+//            res_hash.into_iter().map(|(k, v)| Term::new(v, k)).collect();
+//
+//        res_vec.sort_by(|a, b| P::Ord::cmp(&a.mon, &b.mon));
+//        Poly::from_terms(res_vec, self.ring)
+//    }
+//}
+//
 
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self.ring != rhs.ring {
-            panic!("Can't multiply polynomials in different rings yet");
-        }
-
-        let mut res_hash = HashMap::<P::Mon, P::Coeff>::new();
-
-        for (a, b) in iproduct!(self.terms, rhs.terms) {
-            // Inserts the value into the hashmap if empty, or adds it to the current value if not
-            let Term { coeff: c, mon: m } = a * b;
-            res_hash.entry(m).and_modify(|v| *v += c).or_insert(c);
-        }
-
-        let mut res_vec: Vec<Term<P>> =
-            res_hash.into_iter().map(|(k, v)| Term::new(v, k)).collect();
-
-        res_vec.sort_by(|a, b| P::Ord::cmp(&a.mon, &b.mon));
-        Poly::from_terms(res_vec, self.ring)
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -508,27 +488,24 @@ impl<'a, P: PolyRing> One for Poly<'a, P> {
     }
 }
 
-impl<'a, P: PolyRing> ClosedAdd for Poly<'a, P> {}
+//impl<'a, P: PolyRing> MyAddMonoid for Poly<'a, P> {
+//    fn ref_add(&self, other: &Self) -> Self {
+//        Poly::elementwise_map(&self, &other, |a, b| a + b)
+//    }
+//}
+//
+//impl<'a, P: PolyRing> MyAddGroup for Poly<'a, P> {
+//    fn ref_sub(&self, other: &Self) -> Self {
+//        Poly::elementwise_map(&self, &other, |a, b| a - b)
+//    }
+//}
 
-impl<'a, P: PolyRing> MyAddMonoid for Poly<'a, P> {
-    fn ref_add(&self, other: &Self) -> Self {
-        Poly::elementwise_add(&self, &other, |a, b| a + b)
-    }
-}
-
-impl<'a, P: PolyRing> MyAddGroup for Poly<'a, P> {
-    fn ref_sub(&self, other: &Self) -> Self {
-        Poly::elementwise_add(&self, &other, |a, b| a - b)
-    }
-}
-
-impl<'a, P: PolyRing> ClosedMul for Poly<'a, P> {}
 // FIXME Needs optimisation
-impl<'a, P: PolyRing> MyMulMonoid for Poly<'a, P> {
-    fn ref_mul(&self, other: &Self) -> Self {
-        self.clone() * other.clone()
-    }
-}
+//impl<'a, P: PolyRing> MyMulMonoid for Poly<'a, P> {
+//    fn ref_mul(&self, other: &Self) -> Self {
+//        self.clone() * other.clone()
+//    }
+//}
 
 // Multiplication by a single term
 impl<'a, P: PolyRing> Mul<Term<P>> for &Poly<'a, P> {
@@ -538,7 +515,7 @@ impl<'a, P: PolyRing> Mul<Term<P>> for &Poly<'a, P> {
         let new_terms = self
             .terms
             .iter()
-            .map(|Term { coeff, mon }| Term::new(*coeff * term.coeff, mon.ref_add(&term.mon)))
+            .map(|t| t.clone() * term.clone())
             .collect();
         Poly::from_terms_unchecked(new_terms, self.ring)
     }
@@ -547,15 +524,15 @@ impl<'a, P: PolyRing> Mul<Term<P>> for &Poly<'a, P> {
 /// Scale assign
 /// FIXME This can have a problem if P::Coeff is not an integral domain and then some of the
 /// coefficients can become zero but we don't clean them up here
-impl<'a, P: PolyRing> MulAssign<P::Coeff> for Poly<'a, P> {
-    fn mul_assign(&mut self, scalar: P::Coeff) {
-        if scalar.is_zero() {
-            self.terms.clear();
-        } else {
-            self.elementwise_map_mut(|t| t.coeff *= scalar)
-        }
-    }
-}
+//impl<'a, P: PolyRing> MulAssign<P::Coeff> for Poly<'a, P> {
+//    fn mul_assign(&mut self, scalar: P::Coeff) {
+//        if scalar.is_zero() {
+//            self.terms.clear();
+//        } else {
+//            self.elementwise_map_mut(|t| t.coeff *= scalar)
+//        }
+//    }
+//}
 
 // Returns the ring when performing operations between two polynomials.
 // If one has a None type then this indicates that it is a constant value and
@@ -601,7 +578,7 @@ impl<'a, P: PolyRing> Poly<'a, P> {
     /// ~PO Add a second function argument that tells it what to do if one of the terms is zero,
     /// is way pointwise multiplications and subtractions (i.e. pass the .neg() operation) can be
     /// done faster.
-    pub fn elementwise_add(
+    pub fn elementwise_map(
         polya: &Self,
         polyb: &Self,
         op: fn(P::Coeff, P::Coeff) -> P::Coeff,

@@ -42,7 +42,7 @@ impl<'a, P: PolyRing> KroneckerData<'a, P> {
 
     fn sub(&self, term: &Term<P>) -> Term<PRDomain<P::Coeff, UniVarOrder>> {
         let mut acc = 1;
-        let new_deg = izip!(term.mon.clone(), self.sub_values.iter())
+        let new_deg = term.mon.clone().iter().zip(self.sub_values.iter())
             .map(|(a, b)| {
                 let prev = acc;
                 acc *= b;
@@ -77,7 +77,7 @@ where
 
     // Add them together plus 1. We need a plus one because we need to substitute the term that is
     // strictly larger than the others
-    let sub_data = izip!(max_degs_a, max_degs_b)
+    let sub_data = max_degs_a.iter().zip(max_degs_b.iter())
         .map(|(a, b)| a + b + 1)
         .collect();
 

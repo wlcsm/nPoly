@@ -54,42 +54,42 @@ impl Testable for ZZ {
     }
 }
 
-use crate::algebras::finite_field::FF;
+//use crate::algebras::finite_field::FF;
 
-#[derive(Clone, Copy, Debug)]
-pub struct DistFF(UniformInt<i32>);
-
-impl Distribution<FF> for DistFF {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> FF {
-        FF(self.0.sample(rng))
-    }
-}
-
-impl Testable for FF {
-    type Sampler = DistFF;
-
-    fn gen_sampler(max_size: Self) -> Self::Sampler {
-        DistFF(UniformInt::<i32>::new(-max_size.0.abs(), max_size.0.abs()))
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct DistRR(UniformFloat<f64>);
-
-impl Distribution<RR> for DistRR {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RR {
-        RR(self.0.sample(rng))
-    }
-}
-
-impl Testable for RR {
-    type Sampler = DistRR;
-
-    fn gen_sampler(max_size: Self) -> Self::Sampler {
-        DistRR(UniformFloat::<f64>::new(-max_size.0.abs(), max_size.0.abs()))
-    }
-}
-
+//#[derive(Clone, Copy, Debug)]
+//pub struct DistFF(UniformInt<i32>);
+//
+//impl Distribution<FF> for DistFF {
+//    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> FF {
+//        FF(self.0.sample(rng))
+//    }
+//}
+//
+//impl Testable for FF {
+//    type Sampler = DistFF;
+//
+//    fn gen_sampler(max_size: Self) -> Self::Sampler {
+//        DistFF(UniformInt::<i32>::new(-max_size.0.abs(), max_size.0.abs()))
+//    }
+//}
+//
+//#[derive(Clone, Copy, Debug)]
+//pub struct DistRR(UniformFloat<f64>);
+//
+//impl Distribution<RR> for DistRR {
+//    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> RR {
+//        RR(self.0.sample(rng))
+//    }
+//}
+//
+//impl Testable for RR {
+//    type Sampler = DistRR;
+//
+//    fn gen_sampler(max_size: Self) -> Self::Sampler {
+//        DistRR(UniformFloat::<f64>::new(-max_size.0.abs(), max_size.0.abs()))
+//    }
+//}
+//
 
 use crate::algebras::polyring::*;
 use chrono::Duration;
