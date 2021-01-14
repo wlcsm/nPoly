@@ -1,3 +1,6 @@
+use crate::algebras::*;
+use std::ops::{Add, Sub, Mul, MulAssign};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PolyDense<R: ScalarRing> {
     pub terms: Vec<R>,
@@ -15,9 +18,11 @@ impl<R: ScalarRing> PolyDense<R> {
     }
 }
 
-/// Macro for implementing basic arithmetic operations
+/// Dense Polynomial Arithmetic
+///
+/// Uses a macro to clean up the boilerplate
 #[macro_export]
-macro_rules! impl_arithmetic {
+macro_rules! impl_arithmetic_polydense {
     ($op_trait:ident, $op_func:ident, $op_type:ty) => {
         impl<R: ScalarRing> $op_trait for $op_type {
             type Output = PolyDense<R>;
@@ -25,9 +30,9 @@ macro_rules! impl_arithmetic {
             fn $op_func(self, other: Self) -> PolyDense<R> {
                 let new_coeff = self
                     .terms
-                    .into_iter()
-                    .zip(other.terms.into_iter())
-                    .map(|(a, b)| a.$op_func(b))
+                    .iter()
+                    .zip(other.terms.iter())
+                    .map(|(a, b)| a.$op_func(*b))
                     .collect();
 
                 PolyDense { terms: new_coeff }
@@ -36,15 +41,17 @@ macro_rules! impl_arithmetic {
     };
 }
 
-impl_arithmetic![Add, add, PolyDense<R>];
-impl_arithmetic![Add, add, &PolyDense<R>];
-impl_arithmetic![Sub, sub, PolyDense<R>];
-impl_arithmetic![Sub, sub, &PolyDense<R>];
+impl_arithmetic_polydense![Add, add, PolyDense<R>];
+impl_arithmetic_polydense![Add, add, &PolyDense<R>];
+impl_arithmetic_polydense![Sub, sub, PolyDense<R>];
+impl_arithmetic_polydense![Sub, sub, &PolyDense<R>];
 
+/// Dense Polynomial Multiplication
+///
+/// Uses a simple implementation of the n^2 algorithm
 impl<R: ScalarRing> Mul for PolyDense<R> {
     type Output = Self;
 
-    /// Basic n^2 multiplication algorithm
     fn mul(self, rhs: Self) -> Self::Output {
         let d_a = self.terms.len() + 1;
         let d_b = rhs.terms.len() + 1;
@@ -71,7 +78,6 @@ impl<R: ScalarRing> Mul for PolyDense<R> {
 
 impl<R: ScalarRing> MulAssign for PolyDense<R> {
     fn mul_assign(&mut self, other: PolyDense<R>) {
-        *self = self.clone * other
+        *self = self.clone() * other
     }
 }
-

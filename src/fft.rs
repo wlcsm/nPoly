@@ -1,8 +1,6 @@
 // This only does the base 2 FFT. For an arbitrary base, see "fft-mullti-base.rs"
-extern crate chrono;
-
-use crate::algebras::polyring::*;
-use crate::algebras::*;
+use crate::algebras::{ScalarField};
+use crate::polynomials::*;
 use num_traits::Zero;
 
 // Note: Unchecked, assumes that n is a power of two
@@ -18,44 +16,31 @@ pub trait SupportsFFT: ScalarField {
 
 use num::Num;
 
-impl<T: ScalarField + Num+ PartialOrd + RemAssign> SupportsFFT for Complex<T> {
-    fn rou(n: usize, inv: bool) -> Vec<Self> {
-        unimplemented!()
-        }
-    fn divby2(&mut self, n: usize) {
+impl<T: ScalarField + Num + PartialOrd + RemAssign> SupportsFFT for Complex<T> {
+    fn rou(_n: usize, _inv: bool) -> Vec<Self> {
         unimplemented!()
     }
-
+    fn divby2(&mut self, _n: usize) {
+        unimplemented!()
+    }
 }
 
 use std::ops::RemAssign;
-impl<R: SupportsFFT + FFTnum + PartialOrd + RemAssign> Poly<Complex<R>, 1> {
-
-    /// Expands the input into a coefficient vector padded with zeros to length n
-    fn to_coeff_vec(input: &[Term<R, 1>], n: usize) -> Vec<R> {
-        let mut result: Vec<R> = Vec::with_capacity(n);
-        for Term { coeff, mon } in input.iter() {
-            // Fill the gap between monomials with zeros, then add the monomial
-            result.resize(mon.iter().sum(), R::zero());
-            result.push(*coeff);
-        }
-        // Pad the rest
-        result.resize(n, R::zero());
-        result
-    }
-
+impl<R: SupportsFFT + FFTnum + Div<usize, Output = R> + PartialOrd + RemAssign>
+    Poly<Complex<R>, 1>
+{
     /// FFT Multiplication
-    fn fast_mult(&self, other: &Self) -> Self {
+    pub fn fast_mult(&self, other: &Self) -> Self {
         let n = (self.tot_deg() + other.tot_deg() + 1).next_power_of_two();
 
-        let mut a_sig = Poly::to_coeff_vec(&self.terms, n);
-        let mut b_sig = Poly::to_coeff_vec(&other.terms, n);
+        let mut a_sig = to_dense(self, Some(n));
+        let mut b_sig = to_dense(other, Some(n));
 
         // Infix on a_sig
-        test_eval_interp(&mut a_sig[..], &mut b_sig[..]).unwrap();
+        test_eval_interp(&mut a_sig.terms[..], &mut b_sig.terms[..]).unwrap();
 
         // Convert back into polynomial type
-        Poly::from_coeff(self.ring.unwrap(), a_sig)
+        Poly::from_coeff(&a_sig.terms[..])
     }
 }
 

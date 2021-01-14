@@ -1,4 +1,5 @@
 use crate::algebras::ScalarRing;
+use crate::polydense::PolyDense;
 
 /// Sparse Polynomial
 #[derive(Debug, Clone, PartialEq)]
@@ -30,8 +31,40 @@ impl<R: ScalarRing, const VARS: usize> Poly<R, VARS> {
     }
 }
 
-/// Evaluation of polynomials at a value using Horner's method
+/// Converts a polynomial in sparse representation into its equivalent dense representation
+/// by padding with zeros. 
+/// If the "deg" parameter has a value, it will pad the vector of coefficients with zero until
+/// that number
+pub fn to_dense<R: ScalarRing>(input: &Poly<R, 1>, deg: Option<usize>) -> PolyDense<R> {
+    let mut result: Vec<R> = Vec::with_capacity(input.lt().mon[0]);
+
+    for Term { coeff, mon } in input.terms.iter() {
+        result.resize(mon[0], R::zero());
+        result.push(*coeff);
+    }
+
+    if let Some(padding) = deg {
+        result.resize(padding, R::zero());
+    }
+
+    PolyDense { terms: result }
+}
+
 impl<R: ScalarRing> Poly<R, 1> {
+
+    /// Creates a sparse polynomial from the input slice
+    pub fn from_coeff(coeffs: &[R]) -> Poly<R, 1> {
+        let terms = coeffs.into_iter().enumerate().filter_map(|(i, c)| {
+            if c.is_zero() {
+                None
+            } else {
+                Some(Term::new(*c, [i]))
+            }
+        }).collect();
+        Poly { terms }
+    }
+
+    /// Evaluation of polynomials at a value using Horner's method
     pub fn eval(&self, val: R) -> R {
         let (res, last) = self.terms.iter().rev().fold(
             (R::zero(), self.terms.last().unwrap().mon),

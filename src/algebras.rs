@@ -1,9 +1,3 @@
-//pub mod complex;
-//pub mod finite_field;
-//pub mod integers;
-//pub mod real;
-pub mod polyring;
-
 use alga::general::{ClosedAdd, ClosedMul, ClosedSub, ClosedDiv};
 use num_traits::{One, Zero};
 use std::fmt::Debug;

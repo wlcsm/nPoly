@@ -1,23 +1,22 @@
-use crate::algebras::polyring::*;
 use crate::algebras::*;
-use crate::polyu::*;
+use itertools::izip;
+use crate::polynomials::*;
 
-pub fn karatsuba<'a, P: PolyRingUni>(
-    poly_a: &Poly<'a, P>,
-    poly_b: &Poly<'a, P>,
-) -> Poly<'a, P> {
+pub fn karatsuba<R: ScalarRing>(
+    poly_a: &Poly<R, 1>,
+    poly_b: &Poly<R, 1>,
+) -> Poly<R, 1> {
     //  Pad to the nearest power of two
-    let n = (std::cmp::max(poly_a.deg(), poly_b.deg()) + 1).next_power_of_two();
+    let n = (std::cmp::max(poly_a.tot_deg(), poly_b.tot_deg()) + 1).next_power_of_two();
 
-    let sig_a = super::to_coeff_vec(&poly_a.terms, n);
-    let sig_b = super::to_coeff_vec(&poly_b.terms, n);
+    let sig_a = to_dense(&poly_a, Some(n));
+    let sig_b = to_dense(&poly_b, Some(n));
 
-    let res = dense(&sig_a, &sig_b);
-    Poly::from_coeff(poly_a.ring.unwrap(), res)
+    let res = dense(&sig_a.terms[..], &sig_b.terms[..]);
+    Poly::from_coeff(&res[..])
 }
 
 /// Assumes that the arrays are both the same power of two.]
-/// TODO I think I can relax this requirement later.
 ///
 /// I have a weird line below where I use the q1, q2, q3, q4 iterators to
 /// combine everything together at the end. This is because in Rust we cannot initialize an
@@ -30,18 +29,8 @@ pub fn karatsuba<'a, P: PolyRingUni>(
 /// To recombine them, we need to evaluate z2 * X^N + (z1 - z2 - z0) * X^(N/2) + z0, keep in
 /// mind that we are using coefficient vectors.
 ///
-/// Since z0 has N elements, the elements 0...N/2 will not interact with any of the other terms
-/// so we just prepend them to the vector to get q1.
-/// The elements N/2...N-1 will need to be added to the bottom half of the elements in (z1 - z2 -
-/// z0) * X^(N/2), this gives us q2.
-/// There is an extra element that is in (z1 - z2 - z0) * X^(N/2), but not z2 * X^N nor z0
-/// which is the X^(N-1) term, this gives us "extra"
-/// Similarly, the second half of the elements in (z1 - z2 - z0) * X^(N/2) will be added to the
-/// first 0...N/2 elements of z2 * X^N, this gives us q3.
-/// Then we jut append the remaining half of z2 to the end to give us q4.
-///
 /// Then we can collect the iterator into a vector to get the desired output.
-fn dense<'a, R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Vec<R> {
+fn dense<R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Vec<R> {
     let n = arr_a.len();
 
     if n == 2 {
@@ -57,10 +46,9 @@ fn dense<'a, R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Vec<R> {
     let (low_b, high_b) = arr_b.split_at(n / 2);
 
     let z0 = dense(low_a, low_b);
-
     let z1 = dense(
-        &dense_add_slices(low_a, high_a)[..],
-        &dense_add_slices(low_b, high_b)[..],
+        &*add_slice(low_a, high_a),
+        &*add_slice(low_b, high_b),
     );
     let z2 = dense(high_a, high_b);
 
@@ -89,12 +77,10 @@ fn dense<'a, R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Vec<R> {
 
     let q4 = z2[s - 1..].iter().map(|&x| x);
 
-    let res = q1.chain(q2).chain(extra).chain(q3).chain(q4).collect();
-
-    res
+    q1.chain(q2).chain(extra).chain(q3).chain(q4).collect()
 }
 
-fn dense_add_slices<'a, R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Vec<R> {
+fn add_slice<R: ScalarRing>(arr_a: &[R], arr_b: &[R]) -> Box<[R]> {
     izip!(arr_a.into_iter(), arr_b.into_iter())
         .map(|(a, b)| *a + *b)
         .collect()
@@ -162,5 +148,4 @@ mod test {
     //         })
     //         .collect()
     // }
-}
 }
